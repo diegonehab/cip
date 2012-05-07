@@ -1,0 +1,145 @@
+# data file for the Fltk User Interface Designer (fluid)
+version 1.0300 
+header_name {.h} 
+code_name {.cxx}
+widget_class MainFrameUI {open
+  xywh {1055 418 595 125} type Double hide
+  class Fl_Double_Window
+} {
+  Fl_Menu_Bar {} {open
+    xywh {0 0 595 25}
+  } {
+    Submenu {} {
+      label {&File} open
+      xywh {0 0 100 20}
+    } {
+      MenuItem {} {
+        label {&Open...}
+        callback on_file_open
+        xywh {0 0 100 20}
+      }
+      MenuItem {} {
+        label {&Save}
+        callback on_file_save
+        xywh {0 0 100 20}
+      }
+      MenuItem {} {
+        label {Save &as...}
+        callback on_file_save_as
+        xywh {0 0 100 20} divider
+      }
+      MenuItem {} {
+        label {E&xit}
+        callback on_file_exit
+        xywh {0 0 100 20}
+      }
+    }
+  }
+  Fl_Choice m_effects {
+    label {Effect:}
+    callback on_choose_effect open
+    xywh {55 30 170 25} down_box BORDER_BOX
+  } {}
+  Fl_Return_Button {} {
+    label Apply
+    callback on_apply_effect
+    xywh {5 88 85 25}
+  }
+  Fl_Button {} {
+    label Undo
+    callback on_undo_effect
+    xywh {170 88 55 25}
+  }
+  Fl_Group m_param_group {open
+    xywh {235 25 360 100} align 5
+  } {}
+  Fl_Value_Output m_status_fps {
+    label FPS
+    xywh {485 0 75 25} align 8
+  }
+  Fl_Value_Output m_status_rate {
+    label {GP/s}
+    xywh {340 0 90 25} align 8
+  }
+  Fl_Light_Button m_grayscale {
+    label Grayscale
+    callback on_change_grayscale
+    xywh {135 55 90 25}
+  }
+} 
+
+widget_class ParamPosterizeUI {open
+  xywh {1088 627 355 100} type Double hide
+  class Fl_Group
+} {
+  Fl_Value_Slider levels {
+    label {Levels:}
+    xywh {60 10 290 25} type {Horz Knob} align 4 minimum 2 maximum 20 step 1 value 4
+  }
+} 
+
+widget_class ParamScaleUI {open
+  xywh {1098 637 355 100} type Double hide
+  class Fl_Group
+} {
+  Fl_Value_Slider scale {
+    label {Scale:}
+    xywh {60 10 290 25} type {Horz Knob} align 4 maximum 10 value 1
+  }
+} 
+
+widget_class ParamBiasUI {open
+  xywh {1106 808 355 100} type Double hide
+  class Fl_Group
+} {
+  Fl_Value_Slider bias {
+    label {Bias:}
+    xywh {60 10 290 25} type {Horz Knob} align 4 minimum -1
+  }
+} 
+
+widget_class ParamRootUI {open
+  xywh {1116 818 355 100} type Double hide
+  class Fl_Group
+} {
+  Fl_Value_Slider degree {
+    label {Degree:}
+    xywh {60 10 290 25} type {Horz Knob} align 4 minimum 0.01 maximum 10 value 2
+  }
+} 
+
+widget_class ParamThresholdUI {open
+  xywh {1126 828 355 100} type Double hide
+  class Fl_Group
+} {
+  Fl_Value_Slider threshold {
+    label {Threshold:}
+    xywh {85 10 265 25} type {Horz Knob} align 4 value 0.5
+  }
+} 
+
+widget_class ParamReplacementUI {open
+  xywh {882 615 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Button old_color {
+    label {Old Color}
+    xywh {55 16 105 25}
+  }
+  Fl_Button new_color {
+    label {New Color}
+    xywh {200 16 105 25}
+  }
+  Fl_Value_Slider tau_red {
+    label {τ_red}
+    xywh {7 66 110 25} type {Horz Knob} align 1 value 0.5
+  }
+  Fl_Value_Slider tau_green {
+    label {τ_green}
+    xywh {124 66 110 25} type {Horz Knob} align 1 value 0.5
+  }
+  Fl_Value_Slider tau_blue {
+    label {τ_blue} selected
+    xywh {240 66 110 25} type {Horz Knob} align 1 value 0.5
+  }
+} 

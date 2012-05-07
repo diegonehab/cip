@@ -1,0 +1,2 @@
+#cmakedefine USE_SM20 1
+#cmakedefine HAS_GLEW 1

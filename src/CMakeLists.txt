@@ -1,0 +1,20 @@
+include_directories(${CUDA_SDK_ROOT_DIR}/common/inc ${FLTK_INCLUDE_DIR}
+    ${OPENGL_INCLUDE_DIR} ${GLEW_INCLUDE_DIRS})
+link_directories(${CUDA_SDK_ROOT_DIR}/common/lib)
+
+set(CUDA_BUILD_CUBIN off)
+
+set(HAS_GLEW ${GLEW_FOUND})
+
+configure_file(config.h.in config.h)
+
+fltk_wrap_ui(nlfilter nlfilter_gui.fl)
+
+set(SOURCES nlfilter.cpp image.cpp alg5.cu image_frame.cpp threads.cpp
+    filter.cu vsync.cpp timer.cpp util.cu
+    ${nlfilter_FLTK_UI_SRCS})
+
+cuda_add_executable(nlfilter ${SOURCES})
+target_link_libraries(nlfilter ${CUTIL_LIBRARY} ${FLTK_LIBRARIES}
+    ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} pthread)
+
