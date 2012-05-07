@@ -5,7 +5,7 @@
 #include "config.h"
 
 // number of samples per pixel
-#define SAMPDIM 256
+#define SAMPDIM 8
 
 #define KS 4 // pre- and post-filter kernel support size
 

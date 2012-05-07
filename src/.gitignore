@@ -5,3 +5,4 @@ config.h
 nlfilter
 nlfilter_gui.cxx
 nlfilter_gui.h
+*.swp
