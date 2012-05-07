@@ -261,14 +261,16 @@ void ImageFrame::swap_buffers()
 
     rod::unique_lock lk(pimpl->mtx_buffers);
 
-    for(int i=0; i<3; ++i)
+    int nchannels = pimpl->grayscale ? 1 : 3;
+
+    for(int i=0; i<nchannels; ++i)
     {
         assert(!pimpl->img_backbuffer_channels[i].empty());
         if(pimpl->img_backbuffer_channels[i].empty())
             throw std::runtime_error("Invalid backbuffer");
     }
 
-    for(int i=0; i<3; ++i)
+    for(int i=0; i<nchannels; ++i)
         swap(pimpl->img_backbuffer_channels[i], pimpl->img_buffer_channels[i]);
 
     lk.unlock();

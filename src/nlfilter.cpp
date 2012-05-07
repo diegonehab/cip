@@ -446,6 +446,7 @@ void MainFrame::on_choose_effect(effect_type effect)
             _panel->threshold->callback(on_param_changed, this);
             panel = _panel;
         }
+        break;
     case EFFECT_REPLACEMENT:
         {
             ParamReplacementUI *_panel = new ParamReplacementUI(0,0,pw,ph);
