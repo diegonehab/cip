@@ -50,10 +50,10 @@ __device__ inline T bias(T v, float a)
 
 __device__ inline float replacement(float v, float3 old, float3 new_, float3 tau)
 {
-    float3 a = fabs(make_float3(v)-old);
+    float a = fabs(v-grayscale(old));
 
-    if(a.x <= tau.x && a.y <= tau.y && a.z <= tau.z)
-        return grayscale(saturate(new_+a));
+    if(a <= tau.x && a <= tau.y && a <= tau.z)
+        return saturate(grayscale(new_)+a);
     else
         return v;
 }
