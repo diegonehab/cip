@@ -1,2 +1,7 @@
-#cmakedefine USE_SM20 1
+#cmakedefine CUDA_SM @CUDA_SM@
 #cmakedefine HAS_GLEW 1
+
+#ifndef CUDA_SM
+#   define CUDA_SM 20
+#endif
+

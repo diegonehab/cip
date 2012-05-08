@@ -5,7 +5,7 @@
 
 const int BW = 32, // cuda block width
           BH = 6, // cuda block height
-#if USE_SM20
+#if CUDA_SM >= 20
           NB = 8;
 #else
           NB = 5;

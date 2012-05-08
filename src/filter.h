@@ -54,7 +54,7 @@ struct filter_operation
 };
 
 
-#if USE_SM20
+#if CUDA_SM >= 20
 void filter(dvector<float> imgchan[3], int width, int height, int rowstride,
             const filter_operation &op);
 #endif

@@ -6,7 +6,7 @@ set(CUDA_BUILD_CUBIN off)
 
 set(HAS_GLEW ${GLEW_FOUND})
 
-configure_file(config.h.in config.h)
+configure_file(config.h.in config.h ESCAPE_QUOTES)
 
 fltk_wrap_ui(nlfilter nlfilter_gui.fl)
 

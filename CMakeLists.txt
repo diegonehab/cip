@@ -27,7 +27,7 @@ endif()
 
 find_library(CUTIL_LIBRARY NAMES cutil cutil_x86_64 PATHS ${CUDA_SDK_ROOT_DIR}/lib)
 
-set(USE_SM20 true CACHE bool "Compile for sm_20")
+set(CUDA_SM 20 CACHE bool "Compile for which sm?")
 
 set(CUDA_NVCC_FLAGS
   -ccbin=${GCC}
@@ -37,12 +37,7 @@ set(CUDA_NVCC_FLAGS
   -ftz=true -prec-div=false -prec-sqrt=false
 )
 
-if(USE_SM20)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} 
-        -gencode arch=compute_20,code=sm_20)
-else()
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} 
-        -gencode arch=compute_13,code=sm_13)
-endif()
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} 
+    -gencode arch=compute_${CUDA_SM},code=sm_${CUDA_SM})
 
 add_subdirectory(src)

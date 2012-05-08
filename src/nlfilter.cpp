@@ -197,7 +197,7 @@ void *MainFrame::render_thread(MainFrame *frame)
                 }
 
                 // do actual filtering
-#if USE_SM20
+#if CUDA_SM >= 20
                 filter(imgframe->get_output(), imgframe->width(), 
                        imgframe->height(), imgframe->rowstride(), op);
 #else

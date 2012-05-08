@@ -244,7 +244,7 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
 }/*}}}*/
 /*}}}*/
 
-#if USE_SM20
+#if CUDA_SM >= 20
 
 //{{{ RGB filtering =========================================================
 

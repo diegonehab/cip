@@ -30,7 +30,7 @@
 
 const int WS = 32;
 
-#if USE_SM20
+#if CUDA_SM >= 20
 #   define W1 8
 #   define NB1 6
 
@@ -95,7 +95,7 @@ void read_block(Matrix<float,U,V> &block, int m, int n,
           tv = ((n-c_border)*WS+ty+.5f)*inv_height;
 
     float (*bdata)[V] = (float (*)[V]) &block[ty][tx]
-#if USE_SM20
+#if CUDA_SM >= 20
           ,(*bdata2)[V] = (float (*)[V])&block[ty+WS][tx]
 #endif
           ;
@@ -106,7 +106,7 @@ void read_block(Matrix<float,U,V> &block, int m, int n,
         **bdata = tex2D(t_in, tu, tv);
         bdata += W;
 
-#if USE_SM20
+#if CUDA_SM >= 20
         **bdata2 = tex2D(t_in, tu+WS*inv_width, tv);
         bdata2 += W;
 #endif
@@ -117,7 +117,7 @@ void read_block(Matrix<float,U,V> &block, int m, int n,
     if(ty < WS%W)
     {
         **bdata = tex2D(t_in, tu, tv);
-#if USE_SM20
+#if CUDA_SM >= 20
         **bdata2 = tex2D(t_in, tu+WS*inv_width, tv);
 #endif
     }
@@ -270,7 +270,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
                      Matrix<float,R,WS> *g_etvtilde)
 {
     int tx = threadIdx.x, ty = threadIdx.y, 
-#if USE_SM20
+#if CUDA_SM >= 20
         m = blockIdx.x*2, 
 #else
         m = blockIdx.x, 
@@ -279,7 +279,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 
     // each cuda block will work on two horizontally adjacent WSxWS input data
     // blocks, so allocate enough shared memory for these.
-#if USE_SM20
+#if CUDA_SM >= 20
     __shared__ Matrix<float,WS*2,WS+1> block;
 #else
     __shared__ Matrix<float,WS,WS+1> block;
@@ -288,7 +288,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
     // load data into shared memory
     read_block<W1>(block, m, n, c5_inv_with, c5_inv_height);
 
-#if USE_SM20
+#if CUDA_SM >= 20
     m += ty;
     if(m >= c5_m_size)
         return;
@@ -296,7 +296,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 
     __syncthreads();
 
-#if USE_SM20
+#if CUDA_SM >= 20
     if(ty < 2)
 #else
     if(ty == 0)
@@ -323,7 +323,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 #pragma unroll
                 for(int j=1; j<WS; ++j, ++bdata)
                 {
-#if USE_SM20 || ORDER>1
+#if CUDA_SM >= 20 || ORDER>1
                     *bdata = fwd(p, *bdata, c5_weights);
 #else
                     *bdata = p[0] = rec_op(*bdata, p[0]*c5_weights[1]);
@@ -343,7 +343,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 
                 for(int j=WS-2; j>=0; --j, --bdata)
                 {
-#if USE_SM20 || ORDER>1
+#if CUDA_SM >= 20 || ORDER>1
                     *bdata = rev(*bdata, e, c5_weights);
 #else
                     *bdata = e[0] = rec_op(*bdata, e[0]*c5_weights[1]);
@@ -365,7 +365,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 #pragma unroll
                 for(int i=1; i<WS; ++i, ++bdata)
                 {
-#if USE_SM20 || ORDER>1
+#if CUDA_SM >= 20 || ORDER>1
                     **bdata = fwd(p, **bdata, c5_weights);
 #else
                     **bdata = p[0] = rec_op(**bdata, p[0]*c5_weights[1]);
@@ -387,7 +387,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 #pragma unroll
                 for(int i=WS-2; i>=0; --i, --bdata)
                 {
-#if USE_SM20 || ORDER>1
+#if CUDA_SM >= 20 || ORDER>1
                     rev(**bdata, e, c5_weights);
 #else
                     e[0] = rec_op(**bdata, e[0]*c5_weights[1]);
@@ -793,7 +793,7 @@ void write_result(float *g_out,
                   const Matrix<float,R,WS> *g_etv)
 {
     int tx = threadIdx.x, ty = threadIdx.y, 
-#if USE_SM20
+#if CUDA_SM >= 20
         m = blockIdx.x*2,
 #else
         m = blockIdx.x,
@@ -802,7 +802,7 @@ void write_result(float *g_out,
 
     // each cuda block will work on two horizontally adjacent WSxWS input data
     // blocks, so allocate enough shared memory for these.
-#if USE_SM20
+#if CUDA_SM >= 20
     __shared__ Matrix<float,WS*2,WS+1> block;
 #else
     __shared__ Matrix<float,WS,WS+1> block;
@@ -811,7 +811,7 @@ void write_result(float *g_out,
     // load data into shared memory
     read_block<W6>(block, m, n, c5_inv_with, c5_inv_height);
 
-#if USE_SM20
+#if CUDA_SM >= 20
     m += ty;
     if(m >= c5_m_size)
         return;
@@ -819,7 +819,7 @@ void write_result(float *g_out,
 
     __syncthreads();
 
- #if USE_SM20
+ #if CUDA_SM >= 20
     if(ty < 2)
 #else
     if(ty == 0)
@@ -964,7 +964,7 @@ void recursive_filter_5(dvector<float> &d_output, const dvector<float> &d_input)
     cudaBindTextureToArray(t_in, plan->a_in);
 
     collect_carries<<< 
-#if USE_SM20
+#if CUDA_SM >= 20
             dim3((plan->m_size+2-1)/2, plan->n_size), 
 #else
             dim3(plan->m_size, plan->n_size), 
@@ -982,7 +982,7 @@ void recursive_filter_5(dvector<float> &d_output, const dvector<float> &d_input)
          plan->m_size, plan->n_size );
 
     write_result<<< 
-#if USE_SM20
+#if CUDA_SM >= 20
             dim3((plan->m_size+2-1)/2,plan->n_size), 
 #else
             dim3(plan->m_size,plan->n_size), 
