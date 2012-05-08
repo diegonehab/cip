@@ -4,6 +4,7 @@
 #include "symbol.h"
 #include "image_util.h"
 #include "blue_noise.h"
+#include "bspline3_sampler.h"
 
 #define USE_LAUNCH_BOUNDS 1
 const int BW_F1 = 32, // cuda block width
@@ -35,64 +36,34 @@ __constant__ filter_operation filter_op;
 
 // do the actual value processing according to what's in 'filter_op'
 template <class T>
-__device__ T do_filter(T value)
+__device__ T do_filter(const bspline3_sampler<T> &sampler, float2 pos)
 {
     switch(filter_op.type)
     {
     case EFFECT_POSTERIZE:
-        return posterize(value, filter_op.levels);
+        return posterize(sampler(pos), filter_op.levels);
     case EFFECT_SCALE:
-        return scale(value,filter_op.scale);
+        return scale(sampler(pos),filter_op.scale);
     case EFFECT_BIAS:
-        return bias(value,filter_op.bias);
+        return bias(sampler(pos),filter_op.bias);
     case EFFECT_ROOT:
-        return root(value,filter_op.degree);
+        return root(sampler(pos),filter_op.degree);
     case EFFECT_THRESHOLD:
-        return threshold(value,filter_op.threshold);
+        return threshold(sampler(pos),filter_op.threshold);
     case EFFECT_REPLACEMENT:
-        return replacement(value,filter_op.old_color, filter_op.new_color, 
+        return replacement(sampler(pos), 
+                           filter_op.old_color, 
+                           filter_op.new_color, 
                            filter_op.tau);
     case EFFECT_IDENTITY:
     default:
-        return value;
+        return sampler(pos);
     }
 }
 
 //{{{ Grayscale filtering ===================================================
 
 texture<float, cudaTextureType2D, cudaReadModeElementType> t_in_gray;
-
-__device__ inline float interpolate_bicubic_gray(float2 coord_grid)/*{{{*/
-{
-    // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
-//    float2 coord_grid = make_float2(x-0.5f,y-0.5f);
-    float2 index = make_float2(floor(coord_grid.x), floor(coord_grid.y));
-
-    float2 alpha = coord_grid - index;
-    float2 one_alpha = 1.0f - alpha;
-    float2 alpha2 = alpha * alpha;
-
-    float2 w0 = (1/6.f) * one_alpha*one_alpha*one_alpha,
-           w1 = (2/3.f) - 0.5f*alpha2*(2-alpha),
-           w3 = (1/6.f) * alpha*alpha2;
-
-    float2 g0 = w0 + w1;
-    // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
-    float2 h0 = (w1 / g0) - 0.5f + index;
-    float2 h1 = (w3 / (1-g0)) + 1.5f + index;
-
-    // fetch the four linear
-    float tex00 = tex2D(t_in_gray, h0.x, h0.y);
-    float tex01 = tex2D(t_in_gray, h0.x, h1.y);
-    float tex10 = tex2D(t_in_gray, h1.x, h0.y);
-    float tex11 = tex2D(t_in_gray, h1.x, h1.y);
-
-    // weigh along the y-direction
-    tex00 = lerp(tex01, tex00, g0.y);
-    tex10 = lerp(tex11, tex10, g0.y);
-    // weigh along the x-direction
-    return lerp(tex10, tex00, g0.x);
-}/*}}}*/
 
 __global__
 #if USE_LAUNCH_BOUNDS
@@ -139,13 +110,11 @@ void filter_kernel1(float2 *out,/*{{{*/
 
     float *bspline3 = bspline3_data;
 
+    bspline3_sampler<float> sampler(t_in_gray);
+
     for(int s=0; s<SAMPDIM; ++s)
     {
-        // fetch the continuous image value
-        float value = interpolate_bicubic_gray(p+blue_noise[s]);
-
-        // apply filter
-        value = do_filter(value);
+        float value = do_filter(sampler, p+blue_noise[s]);
 
         // scans through the kernel support, collecting data for each position
 #pragma unroll
@@ -279,38 +248,6 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
 
 texture<float4, cudaTextureType2D, cudaReadModeElementType> t_in_rgba;
 
-__device__ inline float3 interpolate_bicubic_rgba(float2 coord_grid)/*{{{*/
-{
-    // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
-//    float2 coord_grid = make_float2(x-0.5f,y-0.5f);
-    float2 index = make_float2(floor(coord_grid.x), floor(coord_grid.y));
-
-    float2 alpha = coord_grid - index;
-    float2 one_alpha = 1.0f - alpha;
-    float2 alpha2 = alpha * alpha;
-
-    float2 w0 = (1/6.f) * one_alpha*one_alpha*one_alpha,
-           w1 = (2/3.f) - 0.5f*alpha2*(2-alpha),
-           w3 = (1/6.f) * alpha*alpha2;
-
-    float2 g0 = w0 + w1;
-    // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
-    float2 h0 = (w1 / g0) - 0.5f + index;
-    float2 h1 = (w3 / (1-g0)) + 1.5f + index;
-
-    // fetch the four linear
-    float3 tex00 = make_float3(tex2D(t_in_rgba, h0.x, h0.y));
-    float3 tex01 = make_float3(tex2D(t_in_rgba, h0.x, h1.y));
-    float3 tex10 = make_float3(tex2D(t_in_rgba, h1.x, h0.y));
-    float3 tex11 = make_float3(tex2D(t_in_rgba, h1.x, h1.y));
-
-    // weigh along the y-direction
-    tex00 = lerp(tex01, tex00, g0.y);
-    tex10 = lerp(tex11, tex10, g0.y);
-    // weigh along the x-direction
-    return lerp(tex10, tex00, g0.x);
-}/*}}}*/
-
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
@@ -355,13 +292,11 @@ void filter_kernel1(float *out_r, float *out_g, float *out_b, float *out_w,/*{{{
 
     float *bspline3 = bspline3_data;
 
+    bspline3_sampler<float3> sampler(t_in_gray);
+
     for(int s=0; s<SAMPDIM; ++s)
     {
-        // fetch the continuous image value
-        float3 value = interpolate_bicubic_rgba(p+blue_noise[s]);
-
-        // apply filter
-        value = do_filter(value);
+        float3 value = do_filter(sampler, p+blue_noise[s]);
 
         // scans through the kernel support, collecting data for each position
 #pragma unroll
