@@ -279,27 +279,6 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
 
 texture<float4, cudaTextureType2D, cudaReadModeElementType> t_in_rgba;
 
-// do the actual value processing according to what's in 'filter_op'
-__device__ float3 do_filter(float3 value)/*{{{*/
-{
-    switch(filter_op.type)
-    {
-    case EFFECT_POSTERIZE:
-        return posterize(value, filter_op.levels);
-    case EFFECT_SCALE:
-        return scale(value,filter_op.scale);
-    case EFFECT_BIAS:
-        return bias(value,filter_op.bias);
-    case EFFECT_ROOT:
-        return root(value,filter_op.degree);
-    case EFFECT_THRESHOLD:
-        return threshold(value,filter_op.threshold);
-    case EFFECT_IDENTITY:
-    default:
-        return value;
-    }
-}/*}}}*/
-
 __device__ inline float3 interpolate_bicubic_rgba(float2 coord_grid)/*{{{*/
 {
     // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
