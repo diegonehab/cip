@@ -55,6 +55,8 @@ __device__ T do_filter(const bspline3_sampler<T> &sampler, float2 pos)
                            filter_op.old_color, 
                            filter_op.new_color, 
                            filter_op.tau);
+    case EFFECT_GRADIENT_EDGE_DETECTION:
+        return gradient_edge_detection(sampler(pos,1,0),sampler(pos,0,1));
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);

@@ -101,6 +101,14 @@ __device__ inline float3 root(float3 v, float n)
     return saturate(pow(v,1/n));
 }
 
+// gradient_edge_detection ------------------------------------------------
+
+template <class T>
+__device__ inline T gradient_edge_detection(T dx, T dy)
+{
+    return saturate(sqrt(dx*dx+dy*dy));
+}
+
 // uniform_quantization ----------------------------------------------------
 
 #if 0
