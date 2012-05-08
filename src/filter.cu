@@ -35,8 +35,8 @@ __constant__ filter_operation filter_op;
 
 
 // do the actual value processing according to what's in 'filter_op'
-template <class T>
-__device__ T do_filter(const bspline3_sampler<T> &sampler, float2 pos)
+template <class S>
+__device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
     switch(filter_op.type)
     {
@@ -65,7 +65,12 @@ __device__ T do_filter(const bspline3_sampler<T> &sampler, float2 pos)
 
 //{{{ Grayscale filtering ===================================================
 
-texture<float, cudaTextureType2D, cudaReadModeElementType> t_in_gray;
+texture<float, 2, cudaReadModeElementType> t_in_gray;
+
+__device__ float texfetch_gray(float x, float y)
+{
+    return tex2D(t_in_gray, x, y);
+}
 
 __global__
 #if USE_LAUNCH_BOUNDS
@@ -112,7 +117,7 @@ void filter_kernel1(float2 *out,/*{{{*/
 
     float *bspline3 = bspline3_data;
 
-    bspline3_sampler<float> sampler(t_in_gray);
+    bspline3_sampler<float> sampler(texfetch_gray);
 
     for(int s=0; s<SAMPDIM; ++s)
     {
@@ -248,7 +253,12 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
 
 //{{{ RGB filtering =========================================================
 
-texture<float4, cudaTextureType2D, cudaReadModeElementType> t_in_rgba;
+texture<float4, 2, cudaReadModeElementType> t_in_rgba;
+
+__device__ float3 texfetch_rgba(float x, float y)
+{
+    return make_float3(tex2D(t_in_rgba, x, y));
+}
 
 __global__
 #if USE_LAUNCH_BOUNDS
@@ -293,8 +303,8 @@ void filter_kernel1(float *out_r, float *out_g, float *out_b, float *out_w,/*{{{
     float2 p = make_float2(x,y)-1.5f;
 
     float *bspline3 = bspline3_data;
-
-    bspline3_sampler<float3> sampler(t_in_gray);
+    
+    bspline3_sampler<float3> sampler(texfetch_rgba);
 
     for(int s=0; s<SAMPDIM; ++s)
     {

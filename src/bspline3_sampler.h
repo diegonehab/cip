@@ -32,42 +32,19 @@ __device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
     }
 }
 
-namespace detail
-{
 
-template <class U> 
-struct conv_sample_type
-{ 
-    typedef U type; 
-    __device__ static const U &conv(const U &v) { return v; }
-};
 
-template <> 
-struct conv_sample_type<float3> 
-{ 
-    typedef float4 type;
-    __device__ static float3 conv(const float4 &v)
-    {
-        return make_float3(v);
-    }
-};
-
-}
 
 template <class T>
 class bspline3_sampler
 {
-    typedef typename detail::conv_sample_type<T>::type texel_type;
-
-    typedef texture<texel_type,cudaTextureType2D,cudaReadModeElementType> 
-        tex_type;
-
-    tex_type m_tex;
-
 public:
+    typedef T (*texfetch_function)(float x, float y);
+    typedef T result_type;
+
     __device__ 
-    bspline3_sampler(tex_type tex)
-        : m_tex(tex)
+    bspline3_sampler(texfetch_function texfetch)
+        : m_texfetch(texfetch)
     {
     }
 
@@ -91,13 +68,11 @@ public:
                h0 = (w1 / g0) - 0.5f + index,
                h1 = (w3 / g1) + 1.5f + index;
 
-        typedef detail::conv_sample_type<T> conv;
-
         // fetch the four linear
-        T tex00 = conv::conv(tex2D(m_tex, h0.x, h0.y)),
-          tex01 = conv::conv(tex2D(m_tex, h0.x, h1.y)),
-          tex10 = conv::conv(tex2D(m_tex, h1.x, h0.y)),
-          tex11 = conv::conv(tex2D(m_tex, h1.x, h1.y));
+        T tex00 = m_texfetch(h0.x, h0.y),
+          tex01 = m_texfetch(h0.x, h1.y),
+          tex10 = m_texfetch(h1.x, h0.y),
+          tex11 = m_texfetch(h1.x, h1.y);
 
         // weigh along the y-direction
         if(ky == 0)
@@ -118,6 +93,8 @@ public:
         else
             return (tex10 - tex00)*g0.x;
     }
+private:
+    texfetch_function m_texfetch;
 };
 
 #endif

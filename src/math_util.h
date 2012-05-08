@@ -23,5 +23,10 @@ __device__ inline float3 pow(float3 v,float n)
     return make_float3(pow(v.x,n),pow(v.y,n),pow(v.z,n));
 }
 
+__device__ inline float3 sqrt(float3 v)
+{
+    return make_float3(sqrt(v.x),sqrt(v.y),sqrt(v.z));
+}
+
 
 #endif
