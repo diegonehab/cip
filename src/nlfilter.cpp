@@ -6,6 +6,7 @@
 #include <FL/Fl_Color_Chooser.H>
 #include <vector>
 #include <cuda_gl_interop.h>
+#include <unistd.h> // for getopt
 #include "image_util.h"
 #include "recfilter.h"
 #include "timer.h"
@@ -116,6 +117,42 @@ MainFrame::~MainFrame()
     m_render_thread.join();
 }
 
+void call_filter(dvector<float> out[3], const dvector<float> in[3],
+                 int width, int height, int rowstride,
+                 const filter_operation &op)
+{
+    // convolve with a bpsline3^-1 to make a cardinal post-filter
+    for(int i=0; i<3; ++i)
+        recursive_filter_5(out[i], in[i]);
+
+    // do actual filtering
+#if CUDA_SM >= 20
+    filter(out, width, height, rowstride, op);
+#else
+    for(int i=0; i<3; ++i)
+        filter(out[i], width, height, rowstride, op);
+#endif
+
+    // convolve with a bpsline3^-1 to make a cardinal pre-filter
+    for(int i=0; i<3; ++i)
+        recursive_filter_5(out[i]);
+}
+
+void call_filter(dvector<float> &out, const dvector<float> &in,
+                 int width, int height, int rowstride,
+                 const filter_operation &op)
+{
+    // convolve with a bpsline3^-1 to make a cardinal post-filter
+    recursive_filter_5(out, in);
+
+    // do actual filtering
+    filter(out, width, height, rowstride, op);
+
+    // convolve with a bpsline3^-1 to make a cardinal pre-filter
+    recursive_filter_5(out);
+}
+
+
 // defined on timer.cpp
 std::string unit_value(double v, double base);
 
@@ -179,38 +216,17 @@ void *MainFrame::render_thread(MainFrame *frame)
             // just process one (grayscale) channel?
             if(frame->m_grayscale->value())
             {
-                recursive_filter_5(imgframe->get_grayscale_output(),
-                                   imgframe->get_grayscale_input());
-
-                filter(imgframe->get_grayscale_output(), imgframe->width(), 
-                       imgframe->height(), imgframe->rowstride(), op);
-
-                recursive_filter_5(imgframe->get_grayscale_output());
+                call_filter(imgframe->get_grayscale_output(),
+                            imgframe->get_grayscale_input(),
+                            imgframe->width(), imgframe->height(),
+                            imgframe->rowstride(), op);
             }
             else
             {
-                // convolve with a bpsline3^-1 to make a cardinal post-filter
-                for(int i=0; i<3; ++i)
-                {
-                    recursive_filter_5(imgframe->get_output()[i],
-                                       imgframe->get_input()[i]);
-                }
-
-                // do actual filtering
-#if CUDA_SM >= 20
-                filter(imgframe->get_output(), imgframe->width(), 
-                       imgframe->height(), imgframe->rowstride(), op);
-#else
-                for(int i=0; i<3; ++i)
-                {
-                    filter(imgframe->get_output()[i], imgframe->width(), 
-                           imgframe->height(), imgframe->rowstride(), op);
-                }
-#endif
-
-                // convolve with a bpsline3^-1 to make a cardinal pre-filter
-                for(int i=0; i<3; ++i)
-                    recursive_filter_5(imgframe->get_output()[i]);
+                call_filter(imgframe->get_output(),
+                            imgframe->get_input(),
+                            imgframe->width(), imgframe->height(),
+                            imgframe->rowstride(), op);
             }
 
             timer.stop();
