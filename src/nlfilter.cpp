@@ -572,14 +572,14 @@ int main(int argc, char *argv[])
 
         if(!outfile.empty())
         {
-            if(argc < 2)
+            if(infile.empty())
                 throw std::runtime_error("Must specify an input image");
 
             filter_operation op = parse_filter_operation(effect);
 
             std::vector<uchar4> imgdata;
             int width, height;
-            load_image(argv[1], &imgdata, &width, &height);
+            load_image(infile, &imgdata, &width, &height);
 
             int rowstride = ((width + 256-1)/256)*256;
 
