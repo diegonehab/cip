@@ -195,6 +195,15 @@ void call_filter(dvector<float> out[3], const dvector<float> in[3],
         timers.flush();
 }
 
+
+void call_filter(dvector<float> inout[3],
+                 int width, int height, int rowstride,
+                 const filter_operation &op,
+                 int flags=0)
+{
+    call_filter(inout, inout, width, height, rowstride, op, flags);
+}
+
 void call_filter(dvector<float> &out, const dvector<float> &in,
                  int width, int height, int rowstride,
                  const filter_operation &op)
@@ -616,15 +625,15 @@ int main(int argc, char *argv[])
             setup_recursive_filter(width, height, rowstride);
 
             dvector<uchar4> d_img;
-            dvector<float> d_input[3], d_output[3];
+            dvector<float> d_channels[3];
 
             d_img.copy2D_from(&imgdata[0], width, height, rowstride);
-            decompose(d_input, d_img, width, height,rowstride);
+            decompose(d_channels, d_img, width, height,rowstride);
 
-            call_filter(d_output, d_input, width, height, rowstride, op, 
+            call_filter(d_channels, width, height, rowstride, op, 
                         VERBOSE);
 
-            compose(d_img, d_output, width, height, rowstride);
+            compose(d_img, d_channels, width, height, rowstride);
 
             d_img.copy2D_to(&imgdata[0], width, height, rowstride);
 
