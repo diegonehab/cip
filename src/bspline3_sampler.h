@@ -1,6 +1,8 @@
 #ifndef NLFILTER_BSPLINE3_SAMPLER_H
 #define NLFILTER_BSPLINE3_SAMPLER_H
 
+#include "math_util.h"
+
 template <class T>
 __device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
                                  int k=0)
@@ -48,7 +50,7 @@ public:
     {
         // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
     //    float2 coord_grid = make_float2(x-0.5f,y-0.5f);
-        float2 index = make_float2(floor(coord_grid.x), floor(coord_grid.y));
+        float2 index = floor(coord_grid-0.5f);
 
         float2 alpha = coord_grid - index;
 

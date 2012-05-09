@@ -18,6 +18,11 @@ __device__ inline float3 rint(float3 v)
     return make_float3(rint(v.x),rint(v.y),rint(v.z));
 }
 
+__device__ inline float2 floor(float2 v)
+{
+    return make_float2(floor(v.x),floor(v.y));
+}
+
 __device__ inline float3 pow(float3 v,float n)
 {
     return make_float3(pow(v.x,n),pow(v.y,n),pow(v.z,n));

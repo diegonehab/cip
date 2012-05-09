@@ -321,7 +321,7 @@ void filter_kernel1(float *out_r, float *out_g, float *out_b, float *out_w,/*{{{
         *ssum[i] = make_float4(0,0,0,0);
 
     // top-left position of the kernel support
-    float2 p = make_float2(x,y)-1.5f;
+    float2 p = make_float2(x,y)-1.5f + 0.5; // 0.5 => pixel center
 
     float *bspline3 = bspline3_data;
     
