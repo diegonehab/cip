@@ -132,7 +132,7 @@ struct ImageFrame::impl
 
 void null_cb(Fl_Widget *, void*) {}
 
-ImageFrame::ImageFrame(const unsigned char *data, int w, int h)
+ImageFrame::ImageFrame(const uchar4 *data, int w, int h)
     : Fl_Gl_Window(0,0,640,480)
 {
     pimpl = new impl();
@@ -176,7 +176,7 @@ ImageFrame::~ImageFrame()
     delete pimpl;
 }
 
-void ImageFrame::set_input_image(const unsigned char *data, int w, int h)
+void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
 {
     if(w <= 0 || h  <= 0)
         throw std::runtime_error("Invalid image dimensions");
@@ -192,7 +192,7 @@ void ImageFrame::set_input_image(const unsigned char *data, int w, int h)
     pimpl->height = h;
     pimpl->rowstride = ((w + 256-1)/256)*256;
 
-    d_img.copy2D_from((uchar4 *)data, w, h, pimpl->rowstride);
+    d_img.copy2D_from(data, w, h, pimpl->rowstride);
 
     decompose(pimpl->img_input_channels, d_img, w, h, pimpl->rowstride);
     grayscale(pimpl->img_input_grayscale, d_img, w, h, pimpl->rowstride);

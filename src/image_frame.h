@@ -9,7 +9,7 @@ template <class T> class dvector;
 class ImageFrame : public Fl_Gl_Window
 {
 public:
-    ImageFrame(const unsigned char *data, int w, int h);
+    ImageFrame(const uchar4 *data, int w, int h);
     ~ImageFrame();
 
     class OutputBufferLocker
@@ -25,7 +25,7 @@ public:
         bool m_locked;
     };
 
-    void set_input_image(const unsigned char *data, int w, int h);
+    void set_input_image(const uchar4 *data, int w, int h);
 
     void set_grayscale(bool en);
 

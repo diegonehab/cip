@@ -1,8 +1,5 @@
 #include <FL/fl_ask.H> // for fl_alert
 #include <FL/Fl_File_Chooser.H>
-#include <FL/Fl_PNG_Image.H>
-#include <FL/Fl_JPEG_Image.H>
-#include <FL/Fl_PNM_Image.H>
 #include <FL/Fl_Color_Chooser.H>
 #include <vector>
 #include <cuda_gl_interop.h>
@@ -269,93 +266,22 @@ void MainFrame::on_change_grayscale(bool gs)
     update_image();
 }
 
-void strupr(char *str)
-{
-    while(*str)
-    {
-        *str = toupper(*str);
-        ++str;
-    }
-}
 
 void MainFrame::open(const char *fname)
 {
-    // Reads 'fname' into an Fl_Image
-    Fl_Image *img;
+    std::vector<uchar4> imgdata;
+    int width, height;
 
-    std::string FNAME = fname;
-    strupr(const_cast<char *>(FNAME.data()));
-
-    if(fl_filename_match(FNAME.c_str(),"*.PNG"))
-        img = new Fl_PNG_Image(fname);
-    else if(fl_filename_match(FNAME.c_str(),"*.JPG"))
-        img = new Fl_JPEG_Image(fname);
-    else if(fl_filename_match(FNAME.c_str(),"*.{PNM,PBM,PGM,PPM}"))
-        img = new Fl_PNM_Image(fname);
-    else
-        throw std::runtime_error("Image type not supported");
-
-    if(img->w()==0 || img->h()==0)
-        throw std::runtime_error("Error loading image");
-
-    // creates an RGBA array out of Fl_Image internal image representation
-    std::vector<unsigned char> imgdata;
-    imgdata.reserve(img->w()*img->h()*4);
-
-    int irow = img->w()*img->d()+img->ld();
-    unsigned char *currow = (unsigned char *)img->data()[0];
-
-    // grayscale?
-    if(img->d() < 3)
-    {
-        for(int i=0; i<img->h(); ++i, currow += irow)
-        {
-            for(int j=0; j<img->w(); ++j)
-            {
-                int p = j*img->d();
-
-                imgdata.push_back(currow[p]);
-                imgdata.push_back(currow[p]);
-                imgdata.push_back(currow[p]);
-
-                // has alpha channel?
-                if(img->d() > 1)
-                    imgdata.push_back(currow[p+1]);
-                else
-                    imgdata.push_back(255);
-            }
-        }
-    }
-    // full RGB
-    else
-    {
-        for(int i=0; i<img->h(); ++i, currow += irow)
-        {
-            for(int j=0; j<img->w(); ++j)
-            {
-                int p = j*img->d();
-
-                imgdata.push_back(currow[p]);
-                imgdata.push_back(currow[p+1]);
-                imgdata.push_back(currow[p+2]);
-
-                // has alpha channel?
-                if(img->d() > 3)
-                    imgdata.push_back(currow[p+3]);
-                else
-                    imgdata.push_back(255);
-            }
-        }
-    }
+    read_image(fname, &imgdata, &width, &height);
 
     // create the image frame with the image data
     if(!m_image_frame)
     {
-        m_image_frame = new ImageFrame(&imgdata[0], img->w(), img->h());
+        m_image_frame = new ImageFrame(&imgdata[0], width, height);
         m_image_frame->show();
     }
     else
-        m_image_frame->set_input_image(&imgdata[0], img->w(), img->h());
+        m_image_frame->set_input_image(&imgdata[0], width, height);
 
     m_image_frame->copy_label(fname);
 

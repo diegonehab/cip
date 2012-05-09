@@ -11,7 +11,7 @@ configure_file(config.h.in config.h ESCAPE_QUOTES)
 fltk_wrap_ui(nlfilter nlfilter_gui.fl)
 
 set(SOURCES nlfilter.cpp image.cpp alg5.cu image_frame.cpp threads.cpp
-    filter.cu vsync.cpp timer.cpp util.cu
+    filter.cu vsync.cpp timer.cpp image_util.cu
     ${nlfilter_FLTK_UI_SRCS})
 
 cuda_add_executable(nlfilter ${SOURCES})
