@@ -252,6 +252,17 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
     cudaUnbindTexture(t_in_gray);
     cudaFreeArray(a_in);
 }/*}}}*/
+
+#if CUDA_SM < 20
+void filter(dvector<float> imgchan[3], int width, int height, 
+            int rowstride,
+            const filter_operation &op)
+{
+    for(int i=0; i<3; ++i)
+        filter(imgchan[i], width, height, rowstride, op);
+}
+#endif
+
 /*}}}*/
 
 #if CUDA_SM >= 20

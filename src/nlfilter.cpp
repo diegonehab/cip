@@ -144,9 +144,15 @@ void setup_recursive_filter(int width, int height, int rowstride)
     }
 }
 
+enum filter_flags
+{
+    VERBOSE=1
+};
+
 void call_filter(dvector<float> out[3], const dvector<float> in[3],
                  int width, int height, int rowstride,
-                 const filter_operation &op)
+                 const filter_operation &op,
+                 int flags=0)
 {
     setup_recursive_filter(width, height, rowstride);
 
@@ -155,12 +161,7 @@ void call_filter(dvector<float> out[3], const dvector<float> in[3],
         recursive_filter_5(out[i], in[i]);
 
     // do actual filtering
-#if CUDA_SM >= 20
     filter(out, width, height, rowstride, op);
-#else
-    for(int i=0; i<3; ++i)
-        filter(out[i], width, height, rowstride, op);
-#endif
 
     // convolve with a bpsline3^-1 to make a cardinal pre-filter
     for(int i=0; i<3; ++i)
@@ -589,7 +590,8 @@ int main(int argc, char *argv[])
             d_img.copy2D_from(&imgdata[0], width, height, rowstride);
             decompose(d_input, d_img, width, height,rowstride);
 
-            call_filter(d_output, d_input, width, height, rowstride, op);
+            call_filter(d_output, d_input, width, height, rowstride, op, 
+                        VERBOSE);
 
             compose(d_img, d_output, width, height, rowstride);
 
