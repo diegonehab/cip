@@ -67,10 +67,15 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 
 texture<float, 2, cudaReadModeElementType> t_in_gray;
 
-__device__ float texfetch_gray(float x, float y)
+struct texfetch_gray
 {
-    return tex2D(t_in_gray, x, y);
-}
+    typedef float result_type;
+
+    __device__ float operator()(float x, float y)
+    {
+        return tex2D(t_in_gray, x, y);
+    }
+};
 
 __global__
 #if USE_LAUNCH_BOUNDS
@@ -117,7 +122,7 @@ void filter_kernel1(float2 *out,/*{{{*/
 
     float *bspline3 = bspline3_data;
 
-    bspline3_sampler<float> sampler(texfetch_gray);
+    bspline3_sampler<texfetch_gray> sampler;
 
     for(int s=0; s<SAMPDIM; ++s)
     {
@@ -255,10 +260,15 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
 
 texture<float4, 2, cudaReadModeElementType> t_in_rgba;
 
-__device__ float3 texfetch_rgba(float x, float y)
+struct texfetch_rgba
 {
-    return make_float3(tex2D(t_in_rgba, x, y));
-}
+    typedef float3 result_type;
+
+    __device__ float3 operator()(float x, float y)
+    {
+        return make_float3(tex2D(t_in_rgba, x, y));
+    }
+};
 
 __global__
 #if USE_LAUNCH_BOUNDS
@@ -304,7 +314,7 @@ void filter_kernel1(float *out_r, float *out_g, float *out_b, float *out_w,/*{{{
 
     float *bspline3 = bspline3_data;
     
-    bspline3_sampler<float3> sampler(texfetch_rgba);
+    bspline3_sampler<texfetch_rgba> sampler;
 
     for(int s=0; s<SAMPDIM; ++s)
     {

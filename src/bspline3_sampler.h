@@ -35,21 +35,16 @@ __device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
 
 
 
-template <class T>
+template <class S>
 class bspline3_sampler
 {
 public:
-    typedef T (*texfetch_function)(float x, float y);
-    typedef T result_type;
+    typedef S sampler_type;
+    typedef typename S::result_type result_type;
 
-    __device__ 
-    bspline3_sampler(texfetch_function texfetch)
-        : m_texfetch(texfetch)
-    {
-    }
 
     __device__ inline 
-    T operator()(float2 coord_grid, int kx=0, int ky=0) const
+    result_type operator()(float2 coord_grid, int kx=0, int ky=0) const
     {
         // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
     //    float2 coord_grid = make_float2(x-0.5f,y-0.5f);
@@ -68,11 +63,13 @@ public:
                h0 = (w1 / g0) - 0.5f + index,
                h1 = (w3 / g1) + 1.5f + index;
 
+        S sampler;
+
         // fetch the four linear
-        T tex00 = m_texfetch(h0.x, h0.y),
-          tex01 = m_texfetch(h0.x, h1.y),
-          tex10 = m_texfetch(h1.x, h0.y),
-          tex11 = m_texfetch(h1.x, h1.y);
+        result_type tex00 = sampler(h0.x, h0.y),
+                    tex01 = sampler(h0.x, h1.y),
+                    tex10 = sampler(h1.x, h0.y),
+                    tex11 = sampler(h1.x, h1.y);
 
         // weigh along the y-direction
         if(ky == 0)
@@ -94,7 +91,6 @@ public:
             return (tex10 - tex00)*g0.x;
     }
 private:
-    texfetch_function m_texfetch;
 };
 
 #endif
