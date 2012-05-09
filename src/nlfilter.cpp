@@ -154,18 +154,45 @@ void call_filter(dvector<float> out[3], const dvector<float> in[3],
                  const filter_operation &op,
                  int flags=0)
 {
-    setup_recursive_filter(width, height, rowstride);
+    timer_pool timers;
+
+    base_timer *timerzao = NULL, *timer = NULL;
+    if(flags & VERBOSE)
+        timerzao = &timers.cpu_add("Filter",width*height,"P");
 
     // convolve with a bpsline3^-1 to make a cardinal post-filter
+    if(flags & VERBOSE)
+        timer = &timers.cpu_add("bspline3^-1 convolution",width*height,"P");
+
     for(int i=0; i<3; ++i)
         recursive_filter_5(out[i], in[i]);
 
+    if(timer)
+        timer->stop();
+
     // do actual filtering
+    if(flags & VERBOSE)
+        timer = &timers.cpu_add("supersampling and transform",width*height,"P");
     filter(out, width, height, rowstride, op);
 
+    if(timer)
+        timer->stop();
+
     // convolve with a bpsline3^-1 to make a cardinal pre-filter
+    if(flags & VERBOSE)
+        timer = &timers.cpu_add("bspline3^-1 convolution",width*height,"P");
+
     for(int i=0; i<3; ++i)
         recursive_filter_5(out[i]);
+
+    if(timer)
+        timer->stop();
+
+    if(timerzao)
+        timerzao->stop();
+
+    if(flags & VERBOSE)
+        timers.flush();
 }
 
 void call_filter(dvector<float> &out, const dvector<float> &in,
@@ -319,6 +346,8 @@ void MainFrame::open(const std::string &fname)
         m_image_frame->set_input_image(&imgdata[0], width, height);
 
     m_image_frame->copy_label(fname.c_str());
+
+    setup_recursive_filter(width, height, m_image_frame->rowstride());
 }
 
 void MainFrame::on_file_open()
@@ -583,6 +612,8 @@ int main(int argc, char *argv[])
             load_image(infile, &imgdata, &width, &height);
 
             int rowstride = ((width + 256-1)/256)*256;
+
+            setup_recursive_filter(width, height, rowstride);
 
             dvector<uchar4> d_img;
             dvector<float> d_input[3], d_output[3];
