@@ -35,10 +35,10 @@ __constant__ filter_operation filter_op;
 
 
 // do the actual value processing according to what's in 'filter_op'
-template <class S>
+template <effect_type OP, class S>
 __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
-    switch(filter_op.type)
+    switch(OP)
     {
     case EFFECT_POSTERIZE:
         return posterize(sampler(pos), filter_op.levels);
@@ -77,6 +77,7 @@ struct texfetch_gray
     }
 };
 
+template <effect_type OP>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
@@ -126,7 +127,7 @@ void filter_kernel1(float2 *out,/*{{{*/
 
     for(int s=0; s<SAMPDIM; ++s)
     {
-        float value = do_filter(sampler, p+blue_noise[s]);
+        float value = do_filter<OP>(sampler, p+blue_noise[s]);
 
         // scans through the kernel support, collecting data for each position
 #pragma unroll
@@ -239,7 +240,34 @@ void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
     {
         dim3 bdim(BW_F1,BH_F1),
              gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-        filter_kernel1<<<gdim, bdim>>>(c, width, height,rowstride);
+
+        switch(op.type)
+        {
+        case EFFECT_IDENTITY:
+            filter_kernel1<EFFECT_IDENTITY><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_POSTERIZE:
+            filter_kernel1<EFFECT_POSTERIZE><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_SCALE:
+            filter_kernel1<EFFECT_SCALE><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_BIAS:
+            filter_kernel1<EFFECT_BIAS><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_ROOT:
+            filter_kernel1<EFFECT_ROOT><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_THRESHOLD:
+            filter_kernel1<EFFECT_THRESHOLD><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_REPLACEMENT:
+            filter_kernel1<EFFECT_REPLACEMENT><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        case EFFECT_GRADIENT_EDGE_DETECTION:
+            filter_kernel1<EFFECT_GRADIENT_EDGE_DETECTION><<<gdim, bdim>>>(c, width, height,rowstride);
+            break;
+        }
     }
 
     {
@@ -281,6 +309,7 @@ struct texfetch_rgba
     }
 };
 
+template <effect_type OP>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
@@ -329,7 +358,7 @@ void filter_kernel1(float *out_r, float *out_g, float *out_b, float *out_w,/*{{{
 
     for(int s=0; s<SAMPDIM; ++s)
     {
-        float3 value = do_filter(sampler, p+blue_noise[s]);
+        float3 value = do_filter<OP>(sampler, p+blue_noise[s]);
 
         // scans through the kernel support, collecting data for each position
 #pragma unroll
@@ -485,8 +514,34 @@ void filter(dvector<float> imgchan[3], int width, int height, int rowstride,/*{{
     {
         dim3 bdim(BW_F1,BH_F1),
              gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-        filter_kernel1<<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3], 
-                                       width, height, rowstride);
+        switch(op.type)
+        {
+        case EFFECT_IDENTITY:
+            filter_kernel1<EFFECT_IDENTITY><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_POSTERIZE:
+            filter_kernel1<EFFECT_POSTERIZE><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_SCALE:
+            filter_kernel1<EFFECT_SCALE><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_BIAS:
+            filter_kernel1<EFFECT_BIAS><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_ROOT:
+            filter_kernel1<EFFECT_ROOT><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_THRESHOLD:
+            filter_kernel1<EFFECT_THRESHOLD><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_REPLACEMENT:
+            filter_kernel1<EFFECT_REPLACEMENT><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        case EFFECT_GRADIENT_EDGE_DETECTION:
+            filter_kernel1<EFFECT_GRADIENT_EDGE_DETECTION><<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3],width, height,rowstride);
+            break;
+        }
+
     }
 
     {
