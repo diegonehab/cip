@@ -16,7 +16,10 @@ template <class T>
 void grayscale(dvector<float> &out, const dvector<T> &in,
                int width, int height, int rowstride);
 
-void read_image(const std::string &fname, std::vector<uchar4> *data,
+void load_image(const std::string &fname, std::vector<uchar4> *data,
                 int *width, int *height);
+
+void save_image(const std::string &fname, const std::vector<uchar4> &data,
+                int width, int height);
 
 #endif

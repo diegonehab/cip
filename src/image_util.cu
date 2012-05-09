@@ -2,6 +2,7 @@
 #include <FL/Fl_JPEG_Image.H>
 #include <FL/Fl_PNM_Image.H>
 #include <FL/filename.H>
+#include <cutil.h>
 #include "math_util.h"
 #include "image_util.h"
 
@@ -219,7 +220,7 @@ std::string strupr(const std::string &str)
     return ret;
 }
 
-void read_image(const std::string &fname, std::vector<uchar4> *data,
+void load_image(const std::string &fname, std::vector<uchar4> *data,
                 int *width, int *height)
 {
     // Reads 'fname' into an Fl_Image
@@ -303,3 +304,14 @@ void read_image(const std::string &fname, std::vector<uchar4> *data,
         }
     }
 }
+
+void save_image(const std::string &fname, const std::vector<uchar4> &data,
+                 int width, int height)
+{
+    if(fl_filename_match(strupr(fname).c_str(),"*.PPM"))
+        throw std::runtime_error("We only support PPM output image format");
+
+    if(!cutSavePPM4ub(fname.c_str(), (unsigned char *)&data[0], width, height))
+        throw std::runtime_error("Error saving output image");
+}
+

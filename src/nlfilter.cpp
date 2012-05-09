@@ -19,7 +19,7 @@ public:
     MainFrame();
     ~MainFrame();
 
-    void open(const char *fname);
+    void open(const std::string &fname);
 
     void on_file_open();
     void on_file_save();
@@ -114,10 +114,42 @@ MainFrame::~MainFrame()
     m_render_thread.join();
 }
 
+// setup recursive filters and other stuff
+void setup_recursive_filter(int width, int height, int rowstride)
+{
+    static bool init_noise = false;
+    static int cur_width=-1, cur_height=-1, cur_rowstride=-1;
+    static Vector<float,1+1> weights;
+
+    if(!init_noise)
+    {
+        // calculate cubic b-spline weights
+        float a = 2.f-std::sqrt(3.0f);
+
+        weights[0] = 1+a;
+        weights[1] = a;
+
+        init_blue_noise();
+        init_noise = true;
+    }
+
+    if(cur_width != width || cur_height!=height || cur_rowstride!=rowstride)
+    {
+        recursive_filter_5_setup(width,height,rowstride,
+                                 weights, CLAMP_TO_EDGE, 1);
+
+        cur_width = width;
+        cur_height = height;
+        cur_rowstride = rowstride;
+    }
+}
+
 void call_filter(dvector<float> out[3], const dvector<float> in[3],
                  int width, int height, int rowstride,
                  const filter_operation &op)
 {
+    setup_recursive_filter(width, height, rowstride);
+
     // convolve with a bpsline3^-1 to make a cardinal post-filter
     for(int i=0; i<3; ++i)
         recursive_filter_5(out[i], in[i]);
@@ -139,6 +171,8 @@ void call_filter(dvector<float> &out, const dvector<float> &in,
                  int width, int height, int rowstride,
                  const filter_operation &op)
 {
+    setup_recursive_filter(width, height, rowstride);
+
     // convolve with a bpsline3^-1 to make a cardinal post-filter
     recursive_filter_5(out, in);
 
@@ -267,12 +301,12 @@ void MainFrame::on_change_grayscale(bool gs)
 }
 
 
-void MainFrame::open(const char *fname)
+void MainFrame::open(const std::string &fname)
 {
     std::vector<uchar4> imgdata;
     int width, height;
 
-    read_image(fname, &imgdata, &width, &height);
+    load_image(fname, &imgdata, &width, &height);
 
     // create the image frame with the image data
     if(!m_image_frame)
@@ -283,25 +317,7 @@ void MainFrame::open(const char *fname)
     else
         m_image_frame->set_input_image(&imgdata[0], width, height);
 
-    m_image_frame->copy_label(fname);
-
-    // setup recursive filters and other stuff
-
-    // calculate cubic b-spline weights
-    Vector<float,1+1> weights;
-    {
-        float a = 2.f-std::sqrt(3.0f);
-
-        weights[0] = 1+a;
-        weights[1] = a;
-    }
-
-    init_blue_noise();
-
-    recursive_filter_5_setup(m_image_frame->width(), 
-                             m_image_frame->height(), 
-                             m_image_frame->rowstride(), 
-                             weights, CLAMP_TO_EDGE, 1);
+    m_image_frame->copy_label(fname.c_str());
 }
 
 void MainFrame::on_file_open()
@@ -441,24 +457,164 @@ void MainFrame::update_image()
     m_wakeup.signal();
 }
 
+filter_operation parse_filter_operation(const std::string &spec)
+{
+    std::istringstream ss(spec);
+
+    std::string opname;
+    getline(ss,opname,'[');
+    if(!ss || ss.eof() || opname.empty())
+        throw std::runtime_error("Syntax error on effect specification");
+
+    filter_operation op;
+
+    if(opname == "identity")
+        op.type = EFFECT_IDENTITY;
+    else if(opname == "gradient_edge_detection")
+        op.type = EFFECT_GRADIENT_EDGE_DETECTION;
+    else if(opname == "posterize")
+    {
+        op.type = EFFECT_POSTERIZE;
+        ss >> op.levels;
+    }
+    else if(opname == "scale")
+    {
+        op.type = EFFECT_SCALE;
+        ss >> op.scale;
+    }
+    else if(opname == "bias")
+    {
+        op.type = EFFECT_BIAS;
+        ss >> op.bias;
+    }
+    else if(opname == "root")
+    {
+        op.type = EFFECT_ROOT;
+        ss >> op.degree;
+    }
+    else if(opname == "threshold")
+    {
+        op.type = EFFECT_THRESHOLD;
+        ss >> op.threshold;
+    }
+    else if(opname == "replacement")
+    {
+        op.type = EFFECT_REPLACEMENT;
+        char c[8];
+        ss >> op.old_color.x >> c[0] >> op.old_color.y >> c[1] >> op.old_color.z
+           >> c[2] >> op.new_color.x >> c[3] >> op.new_color.y >> c[4] >> op.new_color.z
+           >> c[5] >> op.tau.x >> c[6] >> op.tau.y >> c[7] >> op.tau.z;
+        if(ss)
+        {
+            for(int i=0; i<8; ++i)
+            {
+                if(c[i] != ',')
+                    ss.setstate(std::ios::failbit);
+            }
+        }
+    }
+
+    if(!ss || ss.get()!=']' || (ss.get(),!ss.eof()))
+        throw std::runtime_error("Syntax error on effeect specification");
+
+    return op;
+}
+
+void print_help(const char *progname)
+{
+    std::cout << "Usage: " << progname << "  [-e effect_descr] [-o output_file] [input_file]\n"
+            " where effect_descr is one of:\n"
+            "  - identity[]\n"
+            "  - posterize[levels]\n"
+            "  - scale[value]\n"
+            "  - bias[value]\n"
+            "  - root[degree]\n"
+            "  - threshold[value]\n"
+            "  - replacement[old_r,old_g,old_b,new_r,new_g,new_b,tau_r,tau_g,tau_b]\n"
+            "  - gradient_edge_detection[]\n"
+            "\n"
+            "without -o, shows a GUI\n";
+}
+
 int main(int argc, char *argv[])
 {
     try
     {
-        // enables FLTK's multithreading facilities
-        Fl::lock();
+        std::string infile,
+                    outfile,
+                    effect = "identity[]";
 
-        Fl::visual(FL_RGB);
+        int opt;
+        while((opt = getopt(argc, argv, "-ho:e:")) != -1)
+        {
+            switch(opt)
+            {
+            case 'h':
+                print_help(basename(argv[0]));
+                return 0;
+            case 'o':
+                outfile = optarg;
+                break;
+            case 'e':
+                effect = optarg;
+                break;
+            case 1:
+                if(!infile.empty())
+                    throw std::runtime_error("Bad command line parameter (-h for help");
+                infile = optarg;
+                break;
+            }
+        }
 
-        MainFrame frame;
-        frame.show();
+        if(opt != -1)
+            throw std::runtime_error("Bad command line parameter (-h for help");
 
-        // got a command line parameter?
-        if(argc == 2)
-            frame.open(argv[1]); // treat it as a file to be opened
 
-        // run main loop
-        return Fl::run();
+        if(!outfile.empty())
+        {
+            if(argc < 2)
+                throw std::runtime_error("Must specify an input image");
+
+            filter_operation op = parse_filter_operation(effect);
+
+            std::vector<uchar4> imgdata;
+            int width, height;
+            load_image(argv[1], &imgdata, &width, &height);
+
+            int rowstride = ((width + 256-1)/256)*256;
+
+            dvector<uchar4> d_img;
+            dvector<float> d_input[3], d_output[3];
+
+            d_img.copy2D_from(&imgdata[0], width, height, rowstride);
+            decompose(d_input, d_img, width, height,rowstride);
+
+            call_filter(d_output, d_input, width, height, rowstride, op);
+
+            compose(d_img, d_output, width, height, rowstride);
+
+            d_img.copy2D_to(&imgdata[0], width, height, rowstride);
+
+            save_image(outfile, imgdata, width, height);
+            return 0;
+        }
+        else
+        {
+            // enables FLTK's multithreading facilities
+            Fl::lock();
+
+            Fl::visual(FL_RGB);
+
+            MainFrame frame;
+            frame.show();
+
+            // must open an image immediately?
+            if(!infile.empty())
+                frame.open(infile); // do it
+
+            // run main loop
+            return Fl::run();
+        }
     }
     catch(std::exception &e)
     {
