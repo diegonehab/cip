@@ -115,8 +115,14 @@ public:
     {
         m_width = width;
         m_height = height;
-        if(m_rowstride == 0)
+        if(rowstride == 0)
             m_rowstride = ((m_width + 256-1)/256)*256; // multiple of 256
+        else
+        {
+            m_rowstride = rowstride;
+            if(rowstride < width)
+                throw std::runtime_error("Bad row stride");
+        }
 
         m_data.reset(data, m_rowstride*m_height*C);
     }
@@ -164,8 +170,14 @@ public:
     {
         m_width = width;
         m_height = height;
-        if(m_rowstride == 0)
+        if(rowstride == 0)
             m_rowstride = ((m_width + 256-1)/256)*256; // multiple of 256
+        else
+        {
+            if(rowstride < m_width)
+                throw std::runtime_error("Bad row stride");
+            m_rowstride = rowstride;
+        }
 
         m_data.resize(m_rowstride*m_height*C);
 
