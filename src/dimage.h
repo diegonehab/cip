@@ -230,20 +230,18 @@ class dimage_ptr
     template <int D, class EN = void>
     class pixel_proxy/*{{{*/
     {
-        T *m_data;
-        int m_channelstride;
+        dimage_ptr &m_img;
 
     public:
         HOSTDEV
-        pixel_proxy(T *data, int channelstride) 
-            : m_data(data), m_channelstride(channelstride) {}
+        pixel_proxy(dimage_ptr &img): m_img(img) {}
 
         typedef typename pixel_traits<T,D>::type value_type;
 
         HOSTDEV
         pixel_proxy &operator=(const value_type &v)
         {
-            pixel_traits<T,D>::assign(m_data, m_channelstride, v);
+            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), v);
             return *this;
         }
 
@@ -251,9 +249,9 @@ class dimage_ptr
         pixel_proxy &operator+=(const value_type &v)
         {
             value_type temp;
-            pixel_traits<T,D>::assign(temp, m_data, m_channelstride);
+            pixel_traits<T,D>::assign(temp, m_img.m_data, m_img.channelstride());
             temp += v;
-            pixel_traits<T,D>::assign(m_data, m_channelstride, temp);
+            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), temp);
             return *this;
         }
 
@@ -261,9 +259,9 @@ class dimage_ptr
         pixel_proxy &operator-=(const value_type &v)
         {
             value_type temp;
-            pixel_traits<T,D>::assign(temp, m_data, m_channelstride);
+            pixel_traits<T,D>::assign(temp, m_img.m_data, m_img.channelstride());
             temp -= v;
-            pixel_traits<T,D>::assign(m_data, m_channelstride, temp);
+            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), temp);
             return *this;
         }
 
@@ -271,7 +269,7 @@ class dimage_ptr
         operator value_type() const
         {
             value_type val;
-            pixel_traits<T,D>::assign(val, m_data, m_channelstride);
+            pixel_traits<T,D>::assign(val, m_img.m_data, m_img.channelstride());
             return val;
         }
     };/*}}}*/
@@ -281,19 +279,17 @@ class dimage_ptr
     {
     public:
         HOSTDEV
-        pixel_proxy(T *, int) {}
+        pixel_proxy(dimage_ptr &img) {}
     };
 
     template <int D, class EN = void>
     class const_pixel_proxy/*{{{*/
     {
-        const T *m_data;
-        int m_channelstride;
+        const dimage_ptr &m_img;
 
     public:
         HOSTDEV
-        const_pixel_proxy(const T *data, int channelstride) 
-            : m_data(data), m_channelstride(channelstride) {}
+        const_pixel_proxy(const dimage_ptr &img) : m_img(img) {}
 
         typedef typename pixel_traits<T,D>::type value_type;
 
@@ -301,7 +297,7 @@ class dimage_ptr
         operator value_type() const
         {
             value_type val;
-            pixel_traits<T,D>::assign(val, m_data, m_channelstride);
+            pixel_traits<T,D>::assign(val, m_img.m_data, m_img.channelstride());
             return val;
         }
     };/*}}}*/
@@ -311,7 +307,7 @@ class dimage_ptr
     {
     public:
         HOSTDEV
-        const_pixel_proxy(const T *, int) {}
+        const_pixel_proxy(const dimage_ptr &img) {}
     };
 
 public:
@@ -394,11 +390,11 @@ public:
 
     HOSTDEV
     pixel_proxy<C> operator*() 
-        { return pixel_proxy<C>(m_data,channelstride()); }
+        { return pixel_proxy<C>(*this); }
 
     HOSTDEV
     const_pixel_proxy<C> operator*() const
-        { return const_pixel_proxy<C>(m_data,channelstride()); }
+        { return const_pixel_proxy<C>(*this); }
 
     HOSTDEV
     dimage_ptr &operator++()
