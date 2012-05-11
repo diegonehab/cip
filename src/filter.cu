@@ -27,12 +27,10 @@ const int
           NB_F2 = 4;
 #endif
 
-
 __constant__ float2 blue_noise[SAMPDIM];
 __constant__ float bspline3_data[SAMPDIM*KS*KS];
 
 __constant__ filter_operation filter_op;
-
 
 // do the actual value processing according to what's in 'filter_op'
 template <effect_type OP, class S>
@@ -65,78 +63,6 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 
 template <int C>
 struct filter_traits {};
-
-template <class T, class U>
-struct is_same { static const bool value = false; };
-
-template <class T>
-struct is_same<T,T> { static const bool value = true; };
-
-// Grayscale filtering ===================================================
-
-texture<float, 2, cudaReadModeElementType> t_in_gray;
-
-struct texfetch_gray
-{
-    typedef float result_type;
-
-    __device__ float operator()(float x, float y)
-    {
-        return tex2D(t_in_gray, x, y);
-    }
-};
-
-template <> 
-struct filter_traits<1>
-{
-    typedef texfetch_gray texfetch_type;
-    typedef float texel_type;
-    typedef float2 sum_type;
-    typedef float pixel_type;
-    static const int smem_size = 3;
-
-    static 
-    texture<texel_type,2,cudaReadModeElementType> &tex() { return t_in_gray; }
-
-    static void copy_to_array(cudaArray *out, dimage_ptr<float> in)
-    {
-        cudaMemcpy2DToArray(out, 0, 0, in, 
-                            in.rowstride()*sizeof(texel_type),
-                            in.width()*sizeof(texel_type), in.height(),
-                            cudaMemcpyDeviceToDevice);
-    }
-
-    __device__ static pixel_type sample(float x, float y)
-    {
-        return tex2D(t_in_gray, x, y);
-    }
-
-    __device__ static sum_type make_sum(float v)
-    {
-        return make_float2(v);
-    }
-
-    __device__ static sum_type make_sum(pixel_type p, float w)
-    {
-        return make_float2(p, w);
-    }
-
-    __device__ static void output_sum(float *out, int imgstride, sum_type s)
-    {
-        out[0] = s.x;
-        out[imgstride] = s.y;
-    }
-    __device__ static sum_type input_sum(const float *in, int imgstride)
-    {
-        return make_float2(in[0], in[imgstride]);
-    }
-
-    __device__ static pixel_type normalize_sum(sum_type sum)
-    {
-        return sum.x / sum.y;
-    }
-};
-
 
 template <effect_type OP,int C>
 __global__
@@ -333,8 +259,77 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
     cudaFreeArray(a_in);
 }/*}}}*/
 
+
+// Grayscale filtering ===================================================/*{{{*/
+
+texture<float, 2, cudaReadModeElementType> t_in_gray;
+
+struct texfetch_gray
+{
+    typedef float result_type;
+
+    __device__ float operator()(float x, float y)
+    {
+        return tex2D(t_in_gray, x, y);
+    }
+};
+
+template <> 
+struct filter_traits<1>
+{
+    typedef texfetch_gray texfetch_type;
+    typedef float texel_type;
+    typedef float2 sum_type;
+    typedef float pixel_type;
+    static const int smem_size = 3;
+
+    static 
+    texture<texel_type,2,cudaReadModeElementType> &tex() { return t_in_gray; }
+
+    static void copy_to_array(cudaArray *out, dimage_ptr<float> in)
+    {
+        cudaMemcpy2DToArray(out, 0, 0, in, 
+                            in.rowstride()*sizeof(texel_type),
+                            in.width()*sizeof(texel_type), in.height(),
+                            cudaMemcpyDeviceToDevice);
+    }
+
+    __device__ static pixel_type sample(float x, float y)
+    {
+        return tex2D(t_in_gray, x, y);
+    }
+
+    __device__ static sum_type make_sum(float v)
+    {
+        return make_float2(v);
+    }
+
+    __device__ static sum_type make_sum(pixel_type p, float w)
+    {
+        return make_float2(p, w);
+    }
+
+    __device__ static void output_sum(float *out, int imgstride, sum_type s)
+    {
+        out[0] = s.x;
+        out[imgstride] = s.y;
+    }
+    __device__ static sum_type input_sum(const float *in, int imgstride)
+    {
+        return make_float2(in[0], in[imgstride]);
+    }
+
+    __device__ static pixel_type normalize_sum(sum_type sum)
+    {
+        return sum.x / sum.y;
+    }
+};
+
 template 
 void filter(dimage_ptr<float,1> img, const filter_operation &op);
+/*}}}*/
+
+//{{{ RGB filtering =========================================================
 
 #if CUDA_SM < 20
 template<> 
@@ -344,8 +339,6 @@ void filter(dimage_ptr<float,3> img, const filter_operation &op)
         filter(img[i], op);
 }
 #else
-
-//{{{ RGB filtering =========================================================
 
 texture<float4, 2, cudaReadModeElementType> t_in_rgba;
 
@@ -368,7 +361,8 @@ struct filter_traits<3>
     typedef float3 pixel_type;
     static const int smem_size = 5;
 
-    static texture<texel_type,2,cudaReadModeElementType> &tex() { return t_in_rgba; }
+    static texture<texel_type,2,cudaReadModeElementType> &tex() 
+        { return t_in_rgba; }
 
     static void copy_to_array(cudaArray *out, dimage_ptr<float,3> img)
     {
@@ -409,12 +403,12 @@ struct filter_traits<3>
         return make_float3(sum) / sum.w;
     }
 };
-/*}}}*/
 
 template 
 void filter(dimage_ptr<float,3> img, const filter_operation &op);
 
 #endif
+/*}}}*/
 
 
 float bspline3(float r)
