@@ -108,7 +108,7 @@ void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*
         *ssum[i] = cfg::make_sum(0);
 
     // top-left position of the kernel support
-    float2 p = make_float2(x,y)-1.5f;
+    float2 p = make_float2(x,y)-1.5f+0.5f;
 
     float *bspline3 = bspline3_data;
 
