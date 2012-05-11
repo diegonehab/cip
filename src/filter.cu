@@ -35,10 +35,10 @@ __constant__ filter_operation filter_op;
 
 
 // do the actual value processing according to what's in 'filter_op'
-template <class S>
+template <effect_type OP, class S>
 __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
-    switch(filter_op.type)
+    switch(OP)
     {
     case EFFECT_POSTERIZE:
         return posterize(sampler(pos), filter_op.levels);
@@ -63,7 +63,16 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
     }
 }
 
-//{{{ Grayscale filtering ===================================================
+template <int C>
+struct filter_traits {};
+
+template <class T, class U>
+struct is_same { static const bool value = false; };
+
+template <class T>
+struct is_same<T,T> { static const bool value = true; };
+
+// Grayscale filtering ===================================================
 
 texture<float, 2, cudaReadModeElementType> t_in_gray;
 
@@ -77,56 +86,111 @@ struct texfetch_gray
     }
 };
 
+template <> 
+struct filter_traits<1>
+{
+    typedef texfetch_gray texfetch_type;
+    typedef float texel_type;
+    typedef float2 sum_type;
+    typedef float pixel_type;
+    static const int smem_size = 3;
+
+    static 
+    texture<texel_type,2,cudaReadModeElementType> &tex() { return t_in_gray; }
+
+    static void copy_to_array(cudaArray *out, dimage_ptr<float> in)
+    {
+        cudaMemcpy2DToArray(out, 0, 0, in, 
+                            in.rowstride()*sizeof(texel_type),
+                            in.width()*sizeof(texel_type), in.height(),
+                            cudaMemcpyDeviceToDevice);
+    }
+
+    __device__ static pixel_type sample(float x, float y)
+    {
+        return tex2D(t_in_gray, x, y);
+    }
+
+    __device__ static sum_type make_sum(float v)
+    {
+        return make_float2(v);
+    }
+
+    __device__ static sum_type make_sum(pixel_type p, float w)
+    {
+        return make_float2(p, w);
+    }
+
+    __device__ static void output_sum(float *out, int imgstride, sum_type s)
+    {
+        out[0] = s.x;
+        out[imgstride] = s.y;
+    }
+    __device__ static sum_type input_sum(const float *in, int imgstride)
+    {
+        return make_float2(in[0], in[imgstride]);
+    }
+
+    __device__ static pixel_type normalize_sum(sum_type sum)
+    {
+        return sum.x / sum.y;
+    }
+};
+
+
+template <effect_type OP,int C>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
 #endif
-void filter_kernel1(float2 *out,/*{{{*/
-                    int width, int height, int rowstride)
+void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*{{{*/
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int x = blockIdx.x*BW_F1+tx, y = blockIdx.y*BH_F1+ty;
 
-    if(x >= width || y >= height)
+    if(!out.is_inside(x,y))
         return;
 
-    int imgstride = rowstride*height;
-
     // output will point to the pixel we're processing now
-    int idx = y*rowstride+x;
+    int idx = out.offset_at(x,y);
     out += idx;
 
     // we're using some smem as registers not to blow up the register space,
     // here we define how much 'registers' are in smem, the rest is used
     // in regular registers
     
-    const int SMEM_SIZE = 3,
+    typedef filter_traits<C> cfg;
+
+    typedef typename cfg::sum_type sum_type;
+    typedef typename cfg::pixel_type pixel_type;
+    
+    const int SMEM_SIZE = cfg::smem_size,
               REG_SIZE = KS*KS-SMEM_SIZE;
 
-    __shared__ float2 _sum[BH_F1][SMEM_SIZE][BW_F1];
-    float2 (*ssum)[BW_F1] = (float2 (*)[BW_F1]) &_sum[ty][0][tx];
+    __shared__ sum_type _sum[BH_F1][SMEM_SIZE][BW_F1];
+    sum_type (*ssum)[BW_F1] = (sum_type (*)[BW_F1]) &_sum[ty][0][tx];
 
-    float2 sum[REG_SIZE];
+    sum_type sum[REG_SIZE];
 
     // Init registers to zero
     for(int i=0; i<REG_SIZE; ++i)
-        sum[i] = make_float2(0,0);
+        sum[i] = cfg::make_sum(0);
 
 #pragma unroll
     for(int i=0; i<SMEM_SIZE; ++i)
-        *ssum[i] = make_float2(0,0);
+        *ssum[i] = cfg::make_sum(0);
 
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f;
 
     float *bspline3 = bspline3_data;
 
-    bspline3_sampler<texfetch_gray> sampler;
+    bspline3_sampler<typename cfg::texfetch_type> sampler;
 
     for(int s=0; s<SAMPDIM; ++s)
     {
-        float value = do_filter(sampler, p+blue_noise[s]);
+        pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
 
         // scans through the kernel support, collecting data for each position
 #pragma unroll
@@ -134,7 +198,7 @@ void filter_kernel1(float2 *out,/*{{{*/
         {
             float wij = bspline3[i];
 
-            *ssum[i] += make_float2(value*wij, wij);
+            *ssum[i] += cfg::make_sum(value*wij, wij);
         }
         bspline3 += SMEM_SIZE;
 #pragma unroll
@@ -142,7 +206,7 @@ void filter_kernel1(float2 *out,/*{{{*/
         {
             float wij = bspline3[i];
 
-            sum[i] += make_float2(value*wij, wij);
+            sum[i] += cfg::make_sum(value*wij, wij);
         }
         bspline3 += REG_SIZE;
     }
@@ -150,122 +214,136 @@ void filter_kernel1(float2 *out,/*{{{*/
     // writes out to gmem what's in the registers
 #pragma unroll
     for(int i=0; i<SMEM_SIZE; ++i)
-    {
-        *out = *ssum[i];
-        out += imgstride;
-    }
+        *out[i] += *ssum[i];
 
 #pragma unroll
     for(int i=0; i<REG_SIZE; ++i)
-    {
-        *out = sum[i];
-        out += imgstride;
-    }
+        *out[i] += sum[i];
 }/*}}}*/
 
+template <int C>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F2*BH_F2, NB_F2)
 #endif
-void filter_kernel2(float *out, /*{{{*/
-                    const float2 *in,
-                    int width, int height, int rowstride)
+void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
+                    dimage_ptr<const typename filter_traits<C>::sum_type,KS*KS> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int x = blockIdx.x*BW_F2+tx, y = blockIdx.y*BH_F2+ty;
 
     // out of bounds? goodbye
-    if(x >= width || y >= height)
+    if(!in.is_inside(x,y))
         return;
 
-    // size of each image plane
-    int imgstride = rowstride*height;
-
     // in and out points to the input/output pixel we're processing
-    int idx = y*rowstride+x;
+    int idx = in.offset_at(x,y);
     in += idx;
     out += idx;
 
     // treat corner cases where the support is outside the image
-    int mi = min(y+KS,height)-y,
-        mj = min(x+KS,width)-x;
+    int mi = min(y+KS,(int)in.height())-y,
+        mj = min(x+KS,(int)in.width())-x;
+
+    typedef filter_traits<C> cfg;
 
     // sum the contribution of nearby pixels
-    float2 sum = make_float2(0,0);
-
-    int drow = rowstride+imgstride*KS,
-        dcol = imgstride+1;
+    typename cfg::sum_type sum = cfg::make_sum(0);
 
 #pragma unroll
     for(int i=0; i<mi; ++i)
     {
-        const float2 *in_row = in;
 #pragma unroll
         for(int j=0; j<mj; ++j)
         {
-            sum += *in;
-
-            in += dcol;
+            sum += *in[i*KS+j];
+            ++in;
         }
-        in = in_row + drow;
+        in += in.rowstride()-mj;
     }
 
-    *out = sum.x/sum.y;
+    *out = cfg::normalize_sum(sum);
 }/*}}}*/
 
-void filter(dvector<float> &v, int width, int height, int rowstride,/*{{{*/
-            const filter_operation &op)
+template <int C>
+void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
 {
-    copy_to_symbol("filter_op",op);
+    typedef filter_traits<C> cfg;
+    typedef typename cfg::texel_type texel_type;
 
     // copy the input data to a texture
     cudaArray *a_in;
-    cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float>();
-    cudaMallocArray(&a_in, &ccd, width, height);
-    cudaMemcpy2DToArray(a_in, 0, 0, v, rowstride*sizeof(float),
-                        width*sizeof(float), height,
-                        cudaMemcpyDeviceToDevice);
+    cudaChannelFormatDesc ccd 
+        = cudaCreateChannelDesc<typename cfg::texel_type>();
 
-    t_in_gray.normalized = false;
-    t_in_gray.filterMode = cudaFilterModeLinear;
+    cudaMallocArray(&a_in, &ccd, img.width(), img.height());
 
-    t_in_gray.addressMode[0] = t_in_gray.addressMode[1] = cudaAddressModeClamp;
+    cfg::copy_to_array(a_in, img);
 
-    cudaBindTextureToArray(t_in_gray, a_in);
+    cfg::tex().normalized = false;
+    cfg::tex().filterMode = cudaFilterModeLinear;
 
-    dvector<float2> c(v.size()*KS*KS);
+    cfg::tex().addressMode[0]= cfg::tex().addressMode[1] = cudaAddressModeClamp;
+
+    cudaBindTextureToArray(cfg::tex(), a_in);
+
+    copy_to_symbol("filter_op",op);
+
+    dimage<typename cfg::sum_type, KS*KS> temp;
+
+    dim3 bdim(BW_F1,BH_F1),
+         gdim((img.width()+bdim.x-1)/bdim.x, (img.height()+bdim.y-1)/bdim.y);
+
+    switch(op.type)
+    {
+    case EFFECT_IDENTITY:
+        filter_kernel1<EFFECT_IDENTITY,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_POSTERIZE:
+        filter_kernel1<EFFECT_POSTERIZE,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_SCALE:
+        filter_kernel1<EFFECT_SCALE,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_BIAS:
+        filter_kernel1<EFFECT_BIAS,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_ROOT:
+        filter_kernel1<EFFECT_ROOT,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_THRESHOLD:
+        filter_kernel1<EFFECT_THRESHOLD,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_REPLACEMENT:
+        filter_kernel1<EFFECT_REPLACEMENT,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_GRADIENT_EDGE_DETECTION:
+        filter_kernel1<EFFECT_GRADIENT_EDGE_DETECTION,C><<<gdim, bdim>>>(&temp);
+        break;
+    }
                    
     {
-        dim3 bdim(BW_F1,BH_F1),
-             gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-        filter_kernel1<<<gdim, bdim>>>(c, width, height,rowstride);
-    }
-
-    {
         dim3 bdim(BW_F2,BH_F2),
-             gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-        filter_kernel2<<<gdim, bdim>>>(v, c,
-                                       width, height, rowstride);
+             gdim((img.width()+bdim.x-1)/bdim.x,(img.height()+bdim.y-1)/bdim.y);
+        filter_kernel2<C><<<gdim, bdim>>>(img, &temp);
     }
 
-    cudaUnbindTexture(t_in_gray);
+    cudaUnbindTexture(cfg::tex());
     cudaFreeArray(a_in);
 }/*}}}*/
 
+template 
+void filter(dimage_ptr<float,1> img, const filter_operation &op);
+
 #if CUDA_SM < 20
-void filter(dvector<float> imgchan[3], int width, int height, 
-            int rowstride,
-            const filter_operation &op)
+template<> 
+void filter(dimage_ptr<float,3> img, const filter_operation &op)
 {
     for(int i=0; i<3; ++i)
-        filter(imgchan[i], width, height, rowstride, op);
+        filter(img[i], op);
 }
-#endif
-
-/*}}}*/
-
-#if CUDA_SM >= 20
+#else
 
 //{{{ RGB filtering =========================================================
 
@@ -281,226 +359,60 @@ struct texfetch_rgba
     }
 };
 
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW_F1*BH_F1, NB_F1)
-#endif
-void filter_kernel1(float *out_r, float *out_g, float *out_b, float *out_w,/*{{{*/
-                    int width, int height, int rowstride)
+template <> 
+struct filter_traits<3>
 {
-    int tx = threadIdx.x, ty = threadIdx.y;
+    typedef texfetch_rgba texfetch_type;
+    typedef float4 sum_type;
+    typedef float4 texel_type;
+    typedef float3 pixel_type;
+    static const int smem_size = 5;
 
-    int x = blockIdx.x*BW_F1+tx, y = blockIdx.y*BH_F1+ty;
+    static texture<texel_type,2,cudaReadModeElementType> &tex() { return t_in_rgba; }
 
-    if(x >= width || y >= height)
-        return;
-
-    int imgstride = rowstride*height;
-
-    // output will point to the pixel we're processing now
-    int idx = y*rowstride+x;
-    out_r += idx;
-    out_g += idx;
-    out_b += idx;
-    out_w += idx;
-
-    // we're using some smem as registers not to blow up the register space,
-    // here we define how much 'registers' are in smem, the rest is used
-    // in regular registers
-    const int SMEM_SIZE = 5,
-              REG_SIZE = KS*KS-SMEM_SIZE;
-
-    __shared__ float4 _sum[BH_F1][SMEM_SIZE][BW_F1];
-    float4 (*ssum)[BW_F1] = (float4 (*)[BW_F1]) &_sum[ty][0][tx];
-
-    // zeroes out the registers
-    float4 sum[REG_SIZE] = {0};
-
-#pragma unroll
-    for(int i=0; i<SMEM_SIZE; ++i)
-        *ssum[i] = make_float4(0,0,0,0);
-
-    // top-left position of the kernel support
-    float2 p = make_float2(x,y)-1.5f + 0.5; // 0.5 => pixel center
-
-    float *bspline3 = bspline3_data;
-    
-    bspline3_sampler<texfetch_rgba> sampler;
-
-    for(int s=0; s<SAMPDIM; ++s)
+    static void copy_to_array(cudaArray *out, dimage_ptr<float,3> img)
     {
-        float3 value = do_filter(sampler, p+blue_noise[s]);
+        dimage<texel_type> temp;
+        convert(temp, img);
 
-        // scans through the kernel support, collecting data for each position
-#pragma unroll
-        for(int i=0; i<SMEM_SIZE; ++i)
-        {
-            float wij = bspline3[i];
-
-            *ssum[i] += make_float4(value*wij, wij);
-        }
-        bspline3 += SMEM_SIZE;
-#pragma unroll
-        for(int i=0; i<REG_SIZE; ++i)
-        {
-            float wij = bspline3[i];
-
-            sum[i] += make_float4(value*wij, wij);
-        }
-        bspline3 += REG_SIZE;
+        cudaMemcpy2DToArray(out, 0, 0, temp, 
+                            temp.rowstride()*sizeof(texel_type),
+                            temp.width()*sizeof(texel_type), temp.height(),
+                            cudaMemcpyDeviceToDevice);
     }
 
-    // writes out to gmem what's in the registers
-#pragma unroll
-    for(int i=0; i<SMEM_SIZE; ++i)
+    __device__ static sum_type make_sum(float v)
     {
-        *out_r = ssum[i]->x;
-        *out_g = ssum[i]->y;
-        *out_b = ssum[i]->z;
-        *out_w = ssum[i]->w;
-
-        out_r += imgstride;
-        out_g += imgstride;
-        out_b += imgstride;
-        out_w += imgstride;
+        return make_float4(v);
     }
 
-#pragma unroll
-    for(int i=0; i<REG_SIZE; ++i)
+    __device__ static sum_type make_sum(pixel_type p, float w)
     {
-        *out_r = sum[i].x;
-        *out_g = sum[i].y;
-        *out_b = sum[i].z;
-        *out_w = sum[i].w;
-
-        out_r += imgstride;
-        out_g += imgstride;
-        out_b += imgstride;
-        out_w += imgstride;
-    }
-}/*}}}*/
-
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW_F2*BH_F2, NB_F2)
-#endif
-void filter_kernel2(float *out_r, float *out_g, float *out_b, /*{{{*/
-                    const float *in_r, const float *in_g,
-                    const float *in_b, const float *in_w,
-                    int width, int height, int rowstride)
-{
-    int tx = threadIdx.x, ty = threadIdx.y;
-
-    int x = blockIdx.x*BW_F2+tx, y = blockIdx.y*BH_F2+ty;
-
-    // out of bounds? goodbye
-    if(x >= width || y >= height)
-        return;
-
-    // size of each image plane
-    int imgstride = rowstride*height;
-
-    // in and out points to the input/output pixel we're processing
-    int idx = y*rowstride+x;
-
-    in_r += idx;
-    in_g += idx;
-    in_b += idx;
-    in_w += idx;
-
-    out_r += idx;
-    out_g += idx;
-    out_b += idx;
-
-    // treat corner cases where the support is outside the image
-    int mi = min(y+KS,height)-y,
-        mj = min(x+KS,width)-x;
-
-    // sum the contribution of nearby pixels
-    float4 sum = make_float4(0,0,0,0);
-
-    int drow = rowstride+imgstride*KS,
-        dcol = imgstride+1;
-
-#pragma unroll
-    for(int i=0; i<mi; ++i)
-    {
-        const float *in_r_row = in_r,
-                    *in_g_row = in_g,
-                    *in_b_row = in_b,
-                    *in_w_row = in_w;
-#pragma unroll
-        for(int j=0; j<mj; ++j)
-        {
-            sum.x += *in_r;
-            sum.y += *in_g;
-            sum.z += *in_b;
-            sum.w += *in_w;
-
-            in_r += dcol;
-            in_g += dcol;
-            in_b += dcol;
-            in_w += dcol;
-        }
-        in_r = in_r_row + drow;
-        in_g = in_g_row + drow;
-        in_b = in_b_row + drow;
-        in_w = in_w_row + drow;
+        return make_float4(p, w);
     }
 
-
-    *out_r = sum.x/sum.w;
-    *out_g = sum.y/sum.w;
-    *out_b = sum.z/sum.w;
-}/*}}}*/
-
-void filter(dvector<float> imgchan[3], int width, int height, int rowstride,/*{{{*/
-            const filter_operation &op)
-{
-    copy_to_symbol("filter_op",op);
-
-    dvector<float4> img(imgchan[0].size());
-
-    compose(img, imgchan, width, height, rowstride);
-
-    // copy the input data to a texture
-    cudaArray *a_in;
-    cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float4>();
-    cudaMallocArray(&a_in, &ccd, width, height);
-    cudaMemcpy2DToArray(a_in, 0, 0, img, rowstride*sizeof(float4),
-                        width*sizeof(float4), height,
-                        cudaMemcpyDeviceToDevice);
-
-    t_in_rgba.normalized = false;
-    t_in_rgba.filterMode = cudaFilterModeLinear;
-
-    t_in_rgba.addressMode[0] = t_in_rgba.addressMode[1] = cudaAddressModeClamp;
-
-    cudaBindTextureToArray(t_in_rgba, a_in);
-
-    dvector<float> temp[4];
-    for(int i=0; i<4; ++i)
-        temp[i].resize(rowstride*height*KS*KS);
-                   
+    __device__ static void output_sum(float *out, int imgstride, sum_type s)
     {
-        dim3 bdim(BW_F1,BH_F1),
-             gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-        filter_kernel1<<<gdim, bdim>>>(temp[0], temp[1], temp[2], temp[3], 
-                                       width, height, rowstride);
+        out[0] = s.x;
+        out[imgstride] = s.y;
+        out[imgstride*2] = s.z;
+        out[imgstride*3] = s.w;
+    }
+    __device__ static sum_type input_sum(const float *in, int imgstride)
+    {
+        return make_float4(in[0], in[imgstride], 
+                           in[imgstride*2],in[imgstride*3]);
     }
 
+    __device__ static pixel_type normalize_sum(sum_type sum)
     {
-        dim3 bdim(BW_F2,BH_F2),
-             gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-        filter_kernel2<<<gdim, bdim>>>(imgchan[0], imgchan[1], imgchan[2], 
-                                       temp[0], temp[1], temp[2], temp[3],
-                                       width, height, rowstride);
+        return make_float3(sum) / sum.w;
     }
-
-    cudaUnbindTexture(t_in_rgba);
-    cudaFreeArray(a_in);
-}/*}}}*/
+};
 /*}}}*/
+
+template 
+void filter(dimage_ptr<float,3> img, const filter_operation &op);
 
 #endif
 

@@ -33,7 +33,7 @@ set(CUDA_NVCC_FLAGS
   -ccbin=${GCC}
   #-Xptxas -dlcm=cg # gmem uses only L2 cache
   #-Xptxas -dlcm=ca # gmem uses both L1 and L2 cache (default)
-  --ptxas-options=-v -g -O0
+  --ptxas-options=-v 
   -ftz=true -prec-div=false -prec-sqrt=false
 )
 

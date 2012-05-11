@@ -846,7 +846,7 @@ void write_result(float *g_out,
             for(int j=0; j<WS; ++j, ++bdata)
                 *bdata = fwd(p, *bdata, c5_weights);
 
-                --bdata;
+            --bdata;
 
             Vector<float,R> e = m==c5_m_size-1 ? zeros<float,R>()
                                               : ez.col(0);
@@ -949,14 +949,8 @@ struct recfilter5_plan_type
  *  @param[in] b1 Feedforward coefficient
  */
 __host__
-void recursive_filter_5(dvector<float> &d_output, const dvector<float> &d_input)
+void recursive_filter_5(float *d_output, const float *d_input)
 {
-    assert(d_input.size() >= plan->rowstride*plan->height);
-    if(d_input.size() < plan->rowstride*plan->height)
-        throw std::runtime_error("Invalid image size");
-
-    d_output.resize(d_input.size());
-
     cudaMemcpy2DToArray(plan->a_in, 0, 0, d_input, plan->rowstride*sizeof(float),
                         plan->width*sizeof(float), plan->height,
                       cudaMemcpyDeviceToDevice);
@@ -988,14 +982,14 @@ void recursive_filter_5(dvector<float> &d_output, const dvector<float> &d_input)
             dim3(plan->m_size,plan->n_size), 
 #endif
                      dim3(WS, W6)>>>
-        (&d_output, &plan->d_pybar, &plan->d_ezhat, 
+        (d_output, &plan->d_pybar, &plan->d_ezhat, 
          &plan->d_ptucheck, &plan->d_etvtilde);
 
     cudaUnbindTexture(t_in);
 
 }
 
-void recursive_filter_5(dvector<float> &d_inout)
+void recursive_filter_5(float *d_inout)
 {
     recursive_filter_5(d_inout, d_inout);
 }

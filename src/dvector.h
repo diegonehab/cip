@@ -24,38 +24,30 @@
  *  @tparam T Device vector values type
  */
 template <class T>
-class dvector
+class dvector/*{{{*/
 {
 public:
     /** Constructor
-     *  @param[in] that Host (STL) Vector data (non-converted) to be copied into this object
-     */
-    explicit dvector(const std::vector<T> &that) : m_size(0), m_capacity(0), m_data(0)
-    {
-        *this = that;
-    }
-
-    /** Constructor
-     *  @param[in] data Vector data to be copied into this object
+     *  @param[in] data Vector gpu data to be copied into this object
      *  @param[in] size Vector data size
      */
-    dvector(const T *data, size_t size) : m_size(0), m_capacity(0), m_data(0)
+    dvector(const T *data, size_t size)
+        : m_size(size), m_capacity(size), m_data(data)
     {
-        resize(size);
-        cudaMemcpy(this->data(), const_cast<T *>(data), size*sizeof(T), cudaMemcpyHostToDevice);
-        check_cuda_error("Error during memcpy from host to device");
     }
 
     /** Copy Constructor
      *  @param[in] that Copy that object to this object
      */
-    dvector(const dvector &that) : m_size(0), m_capacity(0), m_data(0)
+    dvector(const dvector &that) 
+        : m_size(0), m_capacity(0), m_data(NULL)
     {
         *this = that;
     }
 
     /// Default constructor
-    dvector(size_t size=0) : m_size(0), m_capacity(0), m_data(0)
+    dvector(size_t size=0) 
+        : m_size(0), m_capacity(0), m_data(NULL)
     {
         resize(size);
     }
@@ -87,6 +79,15 @@ public:
         }
         else
             m_size = size;
+    }
+
+    void reset(T *data, size_t size)
+    {
+        cuda_delete(m_data);
+        m_data = NULL;
+
+        m_capacity = m_size = size;
+        m_data = data;
     }
 
     /** @brief Clear this vector
@@ -125,23 +126,11 @@ public:
         return *this;
     }
 
-    /** @brief Assign operator
-     *  @param that Host (STL) Vector to copy from
-     *  @return This device vector with assigned values
-     */
-    dvector &operator=(const std::vector<T> &that)
-    {
-        resize(that.size());
-        cudaMemcpy(data(), &that[0], size()*sizeof(T), cudaMemcpyHostToDevice);
-        check_cuda_error("Error during memcpy from host to device");
-        return *this;
-    }
-
     /** @brief Copy values from this vector to a host (CPU) vector
      *  @param[out] data Host Vector to copy values to
      *  @param[in] s Maximum number of elements to copy
      */
-    void copy_to(T *data, size_t s) const
+    void copy_to_host(T *data, size_t s) const
     {
         using std::min;
 
@@ -149,7 +138,7 @@ public:
         check_cuda_error("Error during memcpy from device to host");
     }
 
-    void copy_from(const T *data, size_t s)
+    void copy_from_host(const T *data, size_t s)
     {
         using std::min;
 
@@ -159,7 +148,7 @@ public:
         check_cuda_error("Error during memcpy from device to host");
     }
 
-    void copy2D_to(T *out, size_t width, size_t height, size_t rowstride) const
+    void copy2D_to_host(T *out, size_t width, size_t height, size_t rowstride) const
     {
         cudaMemcpy2D(out, width*sizeof(T), 
                      data(), rowstride*sizeof(T), 
@@ -168,7 +157,7 @@ public:
         check_cuda_error("Error during memcpy from device to host");
     }
 
-    void copy2D_from(const T *in, size_t width, size_t height, size_t rowstride)
+    void copy2D_from_host(const T *in, size_t width, size_t height, size_t rowstride)
     {
         resize(rowstride*height);
 
@@ -220,15 +209,139 @@ public:
      */
     friend void swap(dvector &a, dvector &b)
     {
-        std::swap(a.m_data, b.m_data);
-        std::swap(a.m_size, b.m_size);
-        std::swap(a.m_capacity, b.m_capacity);
+        using std::swap;
+
+        swap(a.m_data, b.m_data);
+        swap(a.m_size, b.m_size);
+        swap(a.m_capacity, b.m_capacity);
     }
 
 private:
     T *m_data; ///< Vector data
     size_t m_size, m_capacity; ///< Vector size and capacity
-};
+};/*}}}*/
+
+template <class T>
+class dvector_ptr/*{{{*/
+{
+public:
+    __host__ __device__
+    dvector_ptr(T *data, size_t size)
+        : m_size(size), m_data(data)
+    {
+    }
+
+    __host__ __device__
+    void reset(T *data, size_t size)
+    {
+        m_size = size;
+        m_data = data;
+    }
+
+    void fillzero()
+    {
+        cudaMemset(m_data, 0, m_size*sizeof(T));
+    }
+
+#if __CUDA_ARCH__
+    T &operator[](int idx) const
+    {
+        return data()[idx];
+    }
+#else
+    T &operator[](int idx) const
+    {
+        static T value;
+        cudaMemcpy(&value, data()+idx, sizeof(T), cudaMemcpyDeviceToHost);
+        return value;
+    }
+#endif
+
+    size_t copy_to_host(T *data, size_t s=UINT_MAX) const
+    {
+        using std::min;
+
+        size_t nwritten = min(size(),s);
+
+        cudaMemcpy(data, this->data(), nwritten*sizeof(T), cudaMemcpyDeviceToHost);
+        check_cuda_error("Error during memcpy from device to host");
+        return nwritten;
+    }
+
+    size_t copy_from_host(const T *data, size_t s=UINT_MAX)
+    {
+        using std::min;
+
+        size_t nwritten = min(size(),s);
+
+        cudaMemcpy(this->data(), data, nwritten*sizeof(T), cudaMemcpyHostToDevice);
+        check_cuda_error("Error during memcpy from device to host");
+        return nwritten;
+    }
+
+    /** @brief Check if this vector is empty
+     *  @return True if this vector is empty
+     */
+    __device__ __host__
+    bool empty() const { return size()==0; }
+
+    /** @brief Size of this vector
+     *  @return Vector size
+     */
+    __device__ __host__
+    size_t size() const { return m_size; }
+
+    /** @brief Data in this vector
+     *  @return Vector data
+     */
+    __device__ __host__
+    T *data() { return m_data; }
+
+    /** @overload const T *data() const
+     *  @return Constant vector data
+     */
+    __device__ __host__
+    const T *data() const { return m_data; }
+
+    __device__ __host__
+    T &back() const { return operator[](size()-1); }
+
+    /** @brief Data in this vector
+     *  @return Vector data
+     */
+    __device__ __host__
+    operator T*() { return data(); }
+
+    /** @overload operator const T*() const
+     *  @return Constant vector data
+     */
+    __device__ __host__
+    operator const T*() const { return data(); }
+
+
+    __device__ __host__
+    const T *operator&() const { return m_data; }
+
+    __device__ __host__
+    T *operator&() { return m_data; }
+
+    /** @brief Swap vector values
+     *  @param [in,out] a Vector to be swapped
+     *  @param [in,out] b Vector to be swapped
+     */
+    __device__ __host__
+    friend void swap(dvector_ptr &a, dvector_ptr &b)
+    {
+        using std::swap;
+
+        swap(a.m_data, b.m_data);
+        swap(a.m_size, b.m_size);
+    }
+
+private:
+    T *m_data; ///< Vector data
+    size_t m_size; ///< Vector size and capacity
+};/*}}}*/
 
 //=== IMPLEMENTATION ==========================================================
 
@@ -243,7 +356,7 @@ private:
  *  @tparam T Vector values type
  */
 template <class T>
-std::vector<T> to_cpu(const T *d_vec, unsigned len)
+std::vector<T> to_host(const T *d_vec, unsigned len)
 {
     std::vector<T> out;
     out.resize(len);
@@ -262,9 +375,9 @@ std::vector<T> to_cpu(const T *d_vec, unsigned len)
  *  @tparam T Vector values type
  */
 template <class T>
-std::vector<T> to_cpu(const dvector<T> &v)
+std::vector<T> to_host(const dvector<T> &v)
 {
-    return to_cpu(v.data(), v.size());
+    return to_host(v.data(), v.size());
 }
 
 //=============================================================================

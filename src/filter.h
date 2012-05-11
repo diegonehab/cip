@@ -1,8 +1,9 @@
 #ifndef NLFILTER_FILTER_H
 #define NLFILTER_FILTER_H
 
-#include "dvector.h"
 #include "config.h"
+#include "image_util.h"
+#include "dimage.h"
 
 // number of samples per pixel
 #define SAMPDIM 8
@@ -54,10 +55,7 @@ struct filter_operation
 };
 
 
-void filter(dvector<float> imgchan[3], int width, int height, int rowstride,
-            const filter_operation &op);
-
-void filter(dvector<float> &img, int width, int height, int rowstride,
-            const filter_operation &op);
+template <int C> // C = number of channels
+void filter(dimage_ptr<float, C> img, const filter_operation &op);
 
 #endif

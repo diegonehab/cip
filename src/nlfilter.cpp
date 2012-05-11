@@ -149,22 +149,25 @@ enum filter_flags
     VERBOSE=1
 };
 
-void call_filter(dvector<float> out[3], const dvector<float> in[3],
-                 int width, int height, int rowstride,
+template <class T, class U, int C>
+void call_filter(dimage_ptr<T,C> out, 
+                 dimage_ptr<U,C> in,
                  const filter_operation &op,
                  int flags=0)
 {
     timer_pool timers;
 
+    int imgsize = in.width()*in.height();
+
     base_timer *timerzao = NULL, *timer = NULL;
     if(flags & VERBOSE)
-        timerzao = &timers.cpu_add("Filter",width*height,"P");
+        timerzao = &timers.cpu_add("Filter",imgsize,"P");
 
     // convolve with a bpsline3^-1 to make a cardinal post-filter
     if(flags & VERBOSE)
-        timer = &timers.cpu_add("bspline3^-1 convolution",width*height,"P");
+        timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
 
-    for(int i=0; i<3; ++i)
+    for(int i=0; i<C; ++i)
         recursive_filter_5(out[i], in[i]);
 
     if(timer)
@@ -172,17 +175,17 @@ void call_filter(dvector<float> out[3], const dvector<float> in[3],
 
     // do actual filtering
     if(flags & VERBOSE)
-        timer = &timers.cpu_add("supersampling and transform",width*height,"P");
-    filter(out, width, height, rowstride, op);
+        timer = &timers.cpu_add("supersampling and transform",imgsize,"P");
+    filter(out, op);
 
     if(timer)
         timer->stop();
 
     // convolve with a bpsline3^-1 to make a cardinal pre-filter
     if(flags & VERBOSE)
-        timer = &timers.cpu_add("bspline3^-1 convolution",width*height,"P");
+        timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
 
-    for(int i=0; i<3; ++i)
+    for(int i=0; i<C; ++i)
         recursive_filter_5(out[i]);
 
     if(timer)
@@ -194,32 +197,6 @@ void call_filter(dvector<float> out[3], const dvector<float> in[3],
     if(flags & VERBOSE)
         timers.flush();
 }
-
-
-void call_filter(dvector<float> inout[3],
-                 int width, int height, int rowstride,
-                 const filter_operation &op,
-                 int flags=0)
-{
-    call_filter(inout, inout, width, height, rowstride, op, flags);
-}
-
-void call_filter(dvector<float> &out, const dvector<float> &in,
-                 int width, int height, int rowstride,
-                 const filter_operation &op)
-{
-    setup_recursive_filter(width, height, rowstride);
-
-    // convolve with a bpsline3^-1 to make a cardinal post-filter
-    recursive_filter_5(out, in);
-
-    // do actual filtering
-    filter(out, width, height, rowstride, op);
-
-    // convolve with a bpsline3^-1 to make a cardinal pre-filter
-    recursive_filter_5(out);
-}
-
 
 // defined on timer.cpp
 std::string unit_value(double v, double base);
@@ -285,16 +262,12 @@ void *MainFrame::render_thread(MainFrame *frame)
             if(frame->m_grayscale->value())
             {
                 call_filter(imgframe->get_grayscale_output(),
-                            imgframe->get_grayscale_input(),
-                            imgframe->width(), imgframe->height(),
-                            imgframe->rowstride(), op);
+                            imgframe->get_grayscale_input(), op);
             }
             else
             {
                 call_filter(imgframe->get_output(),
-                            imgframe->get_input(),
-                            imgframe->width(), imgframe->height(),
-                            imgframe->rowstride(), op);
+                            imgframe->get_input(), op);
             }
 
             timer.stop();
@@ -313,7 +286,11 @@ void *MainFrame::render_thread(MainFrame *frame)
             Fl::lock();
 
             frame->m_status_fps->value(1.0/timer.elapsed());
-            float rate = imgframe->width()*imgframe->height() / timer.elapsed();
+
+            int imgsize = imgframe->get_output().width() *
+                          imgframe->get_output().height();
+
+            float rate = imgsize / timer.elapsed();
             std::string srate = unit_value(rate, 1000), unit;
             {
                 std::istringstream ss(srate);
@@ -356,7 +333,7 @@ void MainFrame::open(const std::string &fname)
 
     m_image_frame->copy_label(fname.c_str());
 
-    setup_recursive_filter(width, height, m_image_frame->rowstride());
+    setup_recursive_filter(width, height, m_image_frame->get_input().rowstride());
 }
 
 void MainFrame::on_file_open()
@@ -620,22 +597,22 @@ int main(int argc, char *argv[])
             int width, height;
             load_image(infile, &imgdata, &width, &height);
 
-            int rowstride = ((width + 256-1)/256)*256;
 
-            setup_recursive_filter(width, height, rowstride);
+            dimage<uchar4,1> d_img;
+            d_img.copy_from_host(imgdata, width, height);
 
-            dvector<uchar4> d_img;
-            dvector<float> d_channels[3];
+            dimage<float,3> d_channels;
 
-            d_img.copy2D_from(&imgdata[0], width, height, rowstride);
-            decompose(d_channels, d_img, width, height,rowstride);
+            convert(d_channels, &d_img);
 
-            call_filter(d_channels, width, height, rowstride, op, 
-                        VERBOSE);
+            setup_recursive_filter(width, height, d_channels.rowstride());
 
-            compose(d_img, d_channels, width, height, rowstride);
 
-            d_img.copy2D_to(&imgdata[0], width, height, rowstride);
+            call_filter(&d_channels, &d_channels, op, VERBOSE);
+
+            convert(d_img, &d_channels);
+
+            d_img.copy_to_host(imgdata);
 
             save_image(outfile, imgdata, width, height);
             return 0;

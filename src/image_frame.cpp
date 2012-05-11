@@ -24,14 +24,11 @@ struct ImageFrame::impl
            , must_update_texture(false)
            , grayscale(false) {}
 
-    dvector<float> img_input_channels[3],
-                   img_input_grayscale,
-                   img_buffer_channels[3],
-                   img_backbuffer_channels[3];
+    dimage<float,3> img_input, img_buffer, img_backbuffer;
+    dimage<float,1> img_input_grayscale;
 
-    dvector<float4> temp_buffer;
+    dimage<float4> temp_buffer;
 
-    int width, height, rowstride;
     bool must_update_texture;
 
     GLuint tex_output;
@@ -102,17 +99,17 @@ struct ImageFrame::impl
             if(grayscale)
             {
                 for(int i=1; i<3; ++i)
-                    img_buffer_channels[i] = img_buffer_channels[0];
+                    img_buffer[i] = img_buffer[0];
             }
 
-            for(int i=0; i<3; ++i)
-                assert(!img_buffer_channels[i].empty());
+            assert(!img_buffer.empty());
 
-            compose(temp_buffer, img_buffer_channels, width, height, rowstride);
+            convert(temp_buffer, &img_buffer);
 
             cudaMemcpy2DToArray(imgarray, 0, 0, temp_buffer, 
-                                rowstride*sizeof(float4),
-                                width*sizeof(float4), height,
+                                temp_buffer.rowstride()*sizeof(float4),
+                                temp_buffer.width()*sizeof(float4), 
+                                temp_buffer.height(),
                                 cudaMemcpyDeviceToDevice);
             check_cuda_error("Error copying image to array");
 
@@ -186,16 +183,12 @@ void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
     if(!pimpl->gl_ok)
         pimpl->initgl();
 
-    dvector<uchar4> d_img;
+    dimage<uchar4> d_img;
 
-    pimpl->width = w;
-    pimpl->height = h;
-    pimpl->rowstride = ((w + 256-1)/256)*256;
+    d_img.copy_from_host(data, w, h);
 
-    d_img.copy2D_from(data, w, h, pimpl->rowstride);
-
-    decompose(pimpl->img_input_channels, d_img, w, h, pimpl->rowstride);
-    grayscale(pimpl->img_input_grayscale, d_img, w, h, pimpl->rowstride);
+    convert(pimpl->img_input, &d_img);
+    grayscale(pimpl->img_input_grayscale, &d_img);
 
     // to create textures and setup output buffers
     set_grayscale(pimpl->grayscale);
@@ -211,12 +204,9 @@ void ImageFrame::set_grayscale(bool en)
     pimpl->grayscale = en;
 
     if(pimpl->grayscale)
-        pimpl->img_buffer_channels[0] = pimpl->img_input_grayscale;
+        pimpl->img_buffer[0] = pimpl->img_input_grayscale;
     else
-    {
-        for(int i=0; i<3; ++i)
-            pimpl->img_buffer_channels[i] = pimpl->img_input_channels[i];
-    }
+        pimpl->img_buffer = pimpl->img_input;
 
     if(pimpl->cuda_output_resource)
     {
@@ -230,7 +220,7 @@ void ImageFrame::set_grayscale(bool en)
     try
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 
-                     pimpl->width, pimpl->height, 0,
+                     pimpl->img_buffer.width(), pimpl->img_buffer.height(), 0,
                      GL_RGBA, GL_FLOAT, NULL);
         check_glerror();
 
@@ -263,15 +253,11 @@ void ImageFrame::swap_buffers()
 
     int nchannels = pimpl->grayscale ? 1 : 3;
 
-    for(int i=0; i<nchannels; ++i)
-    {
-        assert(!pimpl->img_backbuffer_channels[i].empty());
-        if(pimpl->img_backbuffer_channels[i].empty())
-            throw std::runtime_error("Invalid backbuffer");
-    }
+    assert(!pimpl->img_backbuffer.empty());
+    if(pimpl->img_backbuffer.empty())
+        throw std::runtime_error("Invalid backbuffer");
 
-    for(int i=0; i<nchannels; ++i)
-        swap(pimpl->img_backbuffer_channels[i], pimpl->img_buffer_channels[i]);
+    swap(pimpl->img_backbuffer, pimpl->img_buffer);
 
     lk.unlock();
 
@@ -319,38 +305,23 @@ void ImageFrame::draw()
     }
 }
 
-int ImageFrame::width() const
+dimage_ptr<float,3> ImageFrame::get_output()
 {
-    return pimpl->width;
+    return &pimpl->img_backbuffer;
 }
 
-int ImageFrame::height() const
+dimage_ptr<const float,3> ImageFrame::get_input() const
 {
-    return pimpl->height;
+    return &pimpl->img_input;
 }
 
-int ImageFrame::rowstride() const
+dimage_ptr<float> ImageFrame::get_grayscale_output()
 {
-    return pimpl->rowstride;
+    return pimpl->img_backbuffer[0];
 }
-
-dvector<float> *ImageFrame::get_output()
+dimage_ptr<const float,1> ImageFrame::get_grayscale_input() const
 {
-    return pimpl->img_backbuffer_channels;
-}
-
-const dvector<float> *ImageFrame::get_input() const
-{
-    return pimpl->img_input_channels;
-}
-
-const dvector<float> &ImageFrame::get_grayscale_input() const
-{
-    return pimpl->img_input_grayscale;
-}
-dvector<float> &ImageFrame::get_grayscale_output()
-{
-    return pimpl->img_backbuffer_channels[0];
+    return &pimpl->img_input_grayscale;
 }
 
 ImageFrame::OutputBufferLocker::OutputBufferLocker(ImageFrame &imgframe)

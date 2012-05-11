@@ -1,20 +1,23 @@
 #ifndef NLFILTER_IMAGE_UTIL_H
 #define NLFILTER_IMAGE_UTIL_H
 
-#include "dvector.h"
+#include <vector>
+#include <string>
+#include "dimage.h"
 
-template <class T>
-void compose(dvector<T> &out, const dvector<float> in[3], 
-             int width, int height, int rowstride);
+void convert(dimage<float4,1> &out, dimage_ptr<const float,3> in);
+void convert(dimage<uchar4,1> &out, dimage_ptr<const float,3> in);
+void convert(dimage<float,3> &out, dimage_ptr<const float4,1> in);
+void convert(dimage<float,3> &out, dimage_ptr<const uchar4,1> in);
 
+template <class T, int C>
+void convert(dimage<T,C> &out, dimage_ptr<const T,C> in)
+{
+    out = in;
+}
 
-template <class T>
-void decompose(dvector<float> out[3], const dvector<T> &in, 
-               int width, int height, int rowstride);
-
-template <class T>
-void grayscale(dvector<float> &out, const dvector<T> &in,
-               int width, int height, int rowstride);
+void grayscale(dimage<float,1> &out, dimage_ptr<const float4,1> in);
+void grayscale(dimage<float,1> &out, dimage_ptr<const uchar4,1> in);
 
 void load_image(const std::string &fname, std::vector<uchar4> *data,
                 int *width, int *height);

@@ -255,10 +255,10 @@ void recursive_filter_5_setup(int width, int height, int rowstride,
                               int border=1);
 void recursive_filter_5_free();
 
-void recursive_filter_5(dvector<float> &d_inout);
+void recursive_filter_5(float *d_inout);
 
-void recursive_filter_5(dvector<float> &d_output,
-                        const dvector<float> &d_input);
+void recursive_filter_5(float *d_output,
+                        const float *d_input);
 
 #endif
 

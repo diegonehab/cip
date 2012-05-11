@@ -3,6 +3,7 @@
 
 #include <FL/Fl_Gl_Window.H>
 #include "nlfilter_gui.h"
+#include "dimage.h"
 
 template <class T> class dvector;
 
@@ -29,20 +30,15 @@ public:
 
     void set_grayscale(bool en);
 
-    // we're returning a pointer to an array of 3 channels
-    const dvector<float> *get_input() const;
-    dvector<float> *get_output();
+    dimage_ptr<const float,3> get_input() const;
+    dimage_ptr<float,3> get_output();
 
-    const dvector<float> &get_grayscale_input() const;
-    dvector<float> &get_grayscale_output();
+    dimage_ptr<const float,1> get_grayscale_input() const;
+    dimage_ptr<float,1> get_grayscale_output();
+
 
     void refresh();
     void swap_buffers();
-
-    int width() const;
-    int height() const;
-    int rowstride() const;
-
 private:
 
     virtual void draw();

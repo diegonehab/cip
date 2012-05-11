@@ -6,7 +6,7 @@
 #include "math_util.h"
 #include "image_util.h"
 
-#define USE_LAUNCH_BOUNDS 1
+#define USE_LAUNCH_BOUNDS 0
 
 const int BW = 32, // cuda block width
           BH = 6, // cuda block height
@@ -16,136 +16,120 @@ const int BW = 32, // cuda block width
           NB = 5;
 #endif
 
-// compose -----------------------------------------------------
-
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void compose(float4 *output, 
-             const float *r, const float *g, const float *b,
-             int width, int height, int rowstride)
+void convert(dimage_ptr<float4,1> out, dimage_ptr<const float,3> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
 
-    if(x >= width || y >= height)
+    if(!in.is_inside(x,y))
         return;
 
-    int idx = y*rowstride+x;
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
 
-    output[idx] = make_float4(r[idx],g[idx],b[idx],0);
+    *out = make_float4(*in[0],*in[1],*in[2],1);;
 }
 
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void compose(uchar4 *output, 
-             const float *r, const float *g, const float *b,
-             int width, int height, int rowstride)
+void convert(dimage_ptr<uchar4,1> out, dimage_ptr<const float,3> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
 
-    if(x >= width || y >= height)
+    if(!in.is_inside(x,y))
         return;
 
-    int idx = y*rowstride+x;
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
 
-    float3 v = saturate(make_float3(r[idx],g[idx],b[idx]))*255.0f;
-    output[idx] = make_uchar4(v.x,v.y,v.z,1);
+    float3 v = saturate(make_float3(*in[0],*in[1],*in[2]))*255.0f;
+    *out = make_uchar4(v.x,v.y,v.z,1);
 }
 
-template <class T>
-void compose(dvector<T> &out, const dvector<float> in[3], 
-             int width, int height, int rowstride)
+__global__
+#if USE_LAUNCH_BOUNDS
+__launch_bounds__(BW*BH, NB)
+#endif
+void convert(dimage_ptr<float,3> out, dimage_ptr<const float4,1> in)
 {
-    out.resize(rowstride*height);
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
+
+    if(!in.is_inside(x,y))
+        return;
+
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
+
+    float4 v = *in;
+
+    *out[0] = v.x;
+    *out[1] = v.y;
+    *out[2] = v.z;
+}
+
+__global__
+#if USE_LAUNCH_BOUNDS
+__launch_bounds__(BW*BH, NB)
+#endif
+void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar4,1> in)
+{
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
+
+    if(!in.is_inside(x,y))
+        return;
+
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
+
+    uchar4 v = *in;
+    *out = make_float3(v.x/255.0,v.y/255.0,v.z/255.0);
+}
+
+template <class T, int CT, class U, int CU>
+void call_convert(dimage<T,CT> &out, dimage_ptr<const U,CU> in)
+{
+    out.resize(in.width(), in.height(), in.rowstride());
 
     dim3 bdim(BW,BH),
-         gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
+         gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
 
-    compose<<<gdim, bdim>>>(out, in[0],in[1],in[2], width, height, rowstride);
+    convert<<<gdim, bdim>>>(&out, in);
 }
 
-template 
-void compose(dvector<float4> &out, const dvector<float> in[3], 
-             int width, int height, int rowstride);
-
-template 
-void compose(dvector<uchar4> &out, const dvector<float> in[3], 
-             int width, int height, int rowstride);
-
-
-// decompose -----------------------------------------------------
-
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void decompose(float *r, float *g, float *b, const float4 *input,
-                          int width, int height, int rowstride)
+void convert(dimage<float4,1> &out, dimage_ptr<const float,3> in)
 {
-    int tx = threadIdx.x, ty = threadIdx.y;
-
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(x >= width || y >= height)
-        return;
-
-    int idx = y*rowstride+x;
-
-    float4 v = input[idx];
-    r[idx] = v.x;
-    g[idx] = v.y;
-    b[idx] = v.z;
+    call_convert(out, in);
 }
-
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void decompose(float *r, float *g, float *b, const uchar4 *input,
-                          int width, int height, int rowstride)
+void convert(dimage<uchar4,1> &out, dimage_ptr<const float,3> in)
 {
-    int tx = threadIdx.x, ty = threadIdx.y;
-
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(x >= width || y >= height)
-        return;
-
-    int idx = y*rowstride+x;
-
-    uchar4 v = input[idx];
-    r[idx] = v.x/255.0f;
-    g[idx] = v.y/255.0f;
-    b[idx] = v.z/255.0f;
+    call_convert(out, in);
 }
 
-template <class T>
-void decompose(dvector<float> out[3], const dvector<T> &in, 
-               int width, int height, int rowstride)
+void convert(dimage<float,3> &out, dimage_ptr<const float4,1> in)
 {
-    for(int i=0; i<3; ++i)
-        out[i].resize(rowstride*height);
-
-    dim3 bdim(BW,BH),
-         gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
-
-    decompose<<<gdim, bdim>>>(out[0],out[1],out[2], in, width, height, rowstride);
+    call_convert(out, in);
 }
-
-template
-void decompose(dvector<float> out[3], const dvector<float4> &in, 
-               int width, int height, int rowstride);
-
-template 
-void decompose(dvector<float> out[3], const dvector<uchar4> &in, 
-               int width, int height, int rowstride);
+void convert(dimage<float,3> &out, dimage_ptr<const uchar4,1> in)
+{
+    call_convert(out, in);
+}
 
 // grayscale ------------------------------------------------------------
 
@@ -153,71 +137,62 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void grayscale(float *output, const uchar4 *input,
-               int width, int height, int rowstride)
+void grayscale(dimage_ptr<float,1> out, dimage_ptr<const uchar4,1> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
 
-    if(x >= width || y >= height)
+    if(!in.is_inside(x,y))
         return;
 
-    int idx = y*rowstride+x;
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
 
-    uchar4 in = input[idx];
-    output[idx] = in.x/255.0f*0.2126f + in.y/255.0f*0.7152f + in.z/255.0f*0.0722f;
+    uchar4 p = *in;
+    *out = p.x/255.0f*0.2126f + p.y/255.0f*0.7152f + p.z/255.0f*0.0722f;
 }
 
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void grayscale(float *output, const float4 *input,
-               int width, int height, int rowstride)
+void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float4,1> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
     int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
 
-    if(x >= width || y >= height)
+    if(!in.is_inside(x,y))
         return;
 
-    int idx = y*rowstride+x;
+    int idx = in.offset_at(x,y);
 
-    float4 in = input[idx];
-    output[idx] = in.x*0.2126f + in.y*0.7152f + in.z*0.0722f;
+    float4 p = *in;
+    *out = p.x*0.2126f + p.y*0.7152f + p.z*0.0722f;
 }
 
 template <class T>
-void grayscale(dvector<float> &out, const dvector<T> &in, 
-               int width, int height, int rowstride)
+void call_grayscale(dimage<float,1> &out, dimage_ptr<const T,1> in)
 {
-    out.resize(rowstride*height);
+    out.resize(in.width(), in.height(), in.rowstride());
 
     dim3 bdim(BW,BH),
-         gdim((width+bdim.x-1)/bdim.x, (height+bdim.y-1)/bdim.y);
+         gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
 
-    grayscale<<<gdim, bdim>>>(&out, &in, width, height, rowstride);
+    grayscale<<<gdim, bdim>>>(&out, in);
 }
 
 
-template
-void grayscale(dvector<float> &out, const dvector<float4> &in, 
-               int width, int height, int rowstride);
-
-template 
-void grayscale(dvector<float> &out, const dvector<uchar4> &in, 
-               int width, int height, int rowstride);
-
-std::string strupr(const std::string &str)
+void grayscale(dimage<float,1> &out, dimage_ptr<const float4,1> in)
 {
-    std::string ret;
-    ret.reserve(str.size());
+    call_grayscale(out, in);
+}
 
-    for(int i=0; i<ret.size(); ++i)
-        ret.push_back(toupper(str[i]));
-    return ret;
+void grayscale(dimage<float,1> &out, dimage_ptr<const uchar4,1> in)
+{
+    call_grayscale(out, in);
 }
 
 void load_image(const std::string &fname, std::vector<uchar4> *data,
