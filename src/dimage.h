@@ -284,6 +284,9 @@ class dimage_ptr
             pixel_traits<T,D>::assign(val, m_img.m_data, m_img.channelstride());
             return val;
         }
+
+        T *operator&() { return m_img.m_data; }
+        const T *operator&() const { return m_img.m_data; }
     };/*}}}*/
 
     template <int D>
@@ -312,6 +315,7 @@ class dimage_ptr
             pixel_traits<T,D>::assign(val, m_img.m_data, m_img.channelstride());
             return val;
         }
+        const T *operator&() const { return m_img.m_data; }
     };/*}}}*/
 
     template <int D>
