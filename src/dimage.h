@@ -139,7 +139,7 @@ public:
         copy_to_host(&out[0]);
     }
 
-    void copy_from_host(const T *in, size_t width, size_t height, size_t rowstride=0)
+    void copy_from_host(const T *in, int width, int height, int rowstride=0)
     {
         resize(width, height, rowstride);
 
@@ -153,7 +153,7 @@ public:
         check_cuda_error("Error during memcpy from host to device");
     }
     void copy_from_host(const std::vector<T> &in, 
-                        size_t width, size_t height, size_t rowstride=0)
+                        int width, int height, int rowstride=0)
     {
         assert(in.size() == width*height);
         copy_from_host(&in[0], width, height, rowstride);
@@ -200,10 +200,10 @@ public:
         return *this;
     }
 
-    size_t width() const { return m_width; }
-    size_t height() const { return m_height; }
-    size_t rowstride() const { return m_rowstride; }
-    size_t channelstride() const { return rowstride()*height(); } 
+    int width() const { return m_width; }
+    int height() const { return m_height; }
+    int rowstride() const { return m_rowstride; }
+    int channelstride() const { return rowstride()*height(); } 
 
     dimage_ptr<T,C> operator&();
     dimage_ptr<const T,C> operator&() const;
@@ -211,8 +211,9 @@ public:
     operator T*() { return m_data; }
     operator const T*() const { return m_data; }
 
-    int offset_at(int x, int y) { return y*rowstride()+x; }
-    bool is_inside(size_t x, size_t y) { return x < width() && y < height(); }
+    int offset_at(int x, int y) const { return y*rowstride()+x; }
+    bool is_inside(int x, int y) const 
+        { return x < width() && y < height(); }
 
     dimage_ptr<T,1> operator[](int i);
 
@@ -220,7 +221,7 @@ public:
 
 private:
     dvector<T> m_data;
-    size_t m_width, m_height, m_rowstride;
+    int m_width, m_height, m_rowstride;
 };
 
 template <class T, int C>
@@ -315,13 +316,12 @@ class dimage_ptr
 
 public:
     HOSTDEV
-    dimage_ptr(T *data, size_t width, size_t height, size_t rowstride)
+    dimage_ptr(T *data, int width, int height, int rowstride)
         : m_width(width), m_height(height), m_rowstride(rowstride)
         , m_data(data)
     {
     }
 
-#if 1
     template <class P>
     HOSTDEV
     dimage_ptr(const dimage_ptr<P,C> &that,
@@ -331,36 +331,21 @@ public:
         , m_data(that.m_data)
     {
     }
-#endif
 
     HOSTDEV
-    dimage_ptr(const dimage_ptr &that)
-        : m_width(that.m_width)
-        , m_height(that.m_height)
-        , m_rowstride(that.m_rowstride)
-        , m_data(that.m_data)
-    {
-    }
-
-#if 0
-    operator dimage_ptr<const T,C> () const
-    {
-        return dimage_ptr<const T,C>(m_data, width(), height(), rowstride());
-    }
-#endif
+    int width() const { return m_width; }
+    HOSTDEV
+    int height() const { return m_height; }
+    HOSTDEV
+    int rowstride() const { return m_rowstride; }
 
     HOSTDEV
-    size_t width() const { return m_width; }
-    HOSTDEV
-    size_t height() const { return m_height; }
-    HOSTDEV
-    size_t rowstride() const { return m_rowstride; }
+    int offset_at(int x, int y) const
+        { return y*rowstride()+x; }
 
     HOSTDEV
-    int offset_at(int x, int y) { return y*rowstride()+x; }
-
-    HOSTDEV
-    bool is_inside(size_t x, size_t y) { return x < width() && y < height(); }
+    bool is_inside(int x, int y) const
+        { return x < width() && y < height(); }
 
     dimage_ptr &operator=(dimage_ptr<const T,C> img)
     {
@@ -463,9 +448,9 @@ private:
     friend class dimage_ptr;
 
     HOSTDEV
-    size_t channelstride() const { return rowstride()*height(); } 
+    int channelstride() const { return rowstride()*height(); } 
 
-    size_t m_width, m_height, m_rowstride;
+    int m_width, m_height, m_rowstride;
     T *m_data;
 };
 

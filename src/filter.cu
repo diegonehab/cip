@@ -214,11 +214,11 @@ void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*
     // writes out to gmem what's in the registers
 #pragma unroll
     for(int i=0; i<SMEM_SIZE; ++i)
-        *out[i] += *ssum[i];
+        *out[i] = *ssum[i];
 
 #pragma unroll
     for(int i=0; i<REG_SIZE; ++i)
-        *out[i] += sum[i];
+        *out[SMEM_SIZE+i] = sum[i];
 }/*}}}*/
 
 template <int C>
@@ -243,8 +243,8 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
     out += idx;
 
     // treat corner cases where the support is outside the image
-    int mi = min(y+KS,(int)in.height())-y,
-        mj = min(x+KS,(int)in.width())-x;
+    int mi = min(y+KS,in.height())-y,
+        mj = min(x+KS,in.width())-x;
 
     typedef filter_traits<C> cfg;
 
@@ -290,7 +290,7 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
 
     copy_to_symbol("filter_op",op);
 
-    dimage<typename cfg::sum_type, KS*KS> temp;
+    dimage<typename cfg::sum_type, KS*KS> temp(img.width(), img.height());
 
     dim3 bdim(BW_F1,BH_F1),
          gdim((img.width()+bdim.x-1)/bdim.x, (img.height()+bdim.y-1)/bdim.y);
