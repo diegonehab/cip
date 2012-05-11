@@ -49,4 +49,48 @@ struct remove_const<const T>
     typedef T type;
 };
 
+template <class T, int N>
+class array
+{
+    T m_data[N];
+public:
+    __host__ __device__
+    const T &operator[](int i) const { return m_data[i]; }
+
+    __host__ __device__
+    T &operator[](int i) { return m_data[i]; }
+};
+
+template <class T, int N>
+class array<const T *, N>
+{
+    const T *m_data[N];
+public:
+    __host__ __device__
+    array()
+    {
+    }
+
+    __host__ __device__
+    array(const array &that)
+    {
+        for(int i=0; i<N; ++i)
+            m_data[i] = that[i];
+    }
+
+    __host__ __device__
+    array(const array<T*,N> &that)
+    {
+        for(int i=0; i<N; ++i)
+            m_data[i] = that[i];
+    }
+
+    __host__ __device__
+    const T *&operator[](int i) { return m_data[i]; }
+
+    __host__ __device__
+    const T *const&operator[](int i) const { return m_data[i]; }
+};
+
+
 #endif
