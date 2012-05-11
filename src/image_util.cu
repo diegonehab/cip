@@ -6,7 +6,7 @@
 #include "math_util.h"
 #include "image_util.h"
 
-#define USE_LAUNCH_BOUNDS 0
+#define USE_LAUNCH_BOUNDS 1
 
 const int BW = 32, // cuda block width
           BH = 6, // cuda block height
