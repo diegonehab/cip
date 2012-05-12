@@ -1,6 +1,11 @@
 #ifndef GPUFILTER_UTIL_H
 #define GPUFILTER_UTIL_H
 
+// most of these utilities are in C++TR1 or C++11,
+// but were supporting C++03, so here they are...
+
+#include <limits> // for numeric_limits
+
 inline std::string strupr(const std::string &str)
 {
     std::string ret;
@@ -133,6 +138,13 @@ struct is_volatile<volatile T>
 {
     static const bool value = true;
 };
+
+template <class T>
+struct is_integral 
+{ 
+    static const bool value = std::numeric_limits<T>::is_integer;
+};
+
 
 
 #endif
