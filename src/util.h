@@ -50,17 +50,21 @@ struct remove_const<const T>
 };
 
 template <class T, int N>
-class array
+struct array
 {
-    T m_data[N];
-public:
-    __host__ __device__
-    const T &operator[](int i) const { return m_data[i]; }
+    // public so that it can be initialized with {...}
+    T data[N];
 
     __host__ __device__
-    T &operator[](int i) { return m_data[i]; }
+    const T &operator[](int i) const { return data[i]; }
+
+    __host__ __device__
+    T &operator[](int i) { return data[i]; }
+
+    size_t size() const { return N; }
 };
 
+// for mutable * -> const * conversion
 template <class T, int N>
 class array<const T *, N>
 {
@@ -90,6 +94,8 @@ public:
 
     __host__ __device__
     const T *const&operator[](int i) const { return m_data[i]; }
+
+    size_t size() const { return N; }
 };
 
 template <class FROM, class TO>
@@ -102,6 +108,30 @@ template <class FROM, class TO>
 struct copy_const<const FROM, TO>
 {
     typedef const TO type;
+};
+
+template <class T>
+struct is_const
+{
+    static const bool value = false;
+};
+
+template <class T>
+struct is_const<const T>
+{
+    static const bool value = true;
+};
+
+template <class T>
+struct is_volatile
+{
+    static const bool value = false;
+};
+
+template <class T>
+struct is_volatile<volatile T>
+{
+    static const bool value = true;
 };
 
 

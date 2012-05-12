@@ -104,7 +104,9 @@ struct ImageFrame::impl
 
             assert(!img_buffer.empty());
 
-            convert(temp_buffer, &img_buffer);
+            temp_buffer.resize(img_buffer.width(), img_buffer.height());
+
+            convert(&temp_buffer, &img_buffer);
 
             cudaMemcpy2DToArray(imgarray, 0, 0, temp_buffer, 
                                 temp_buffer.rowstride()*sizeof(float4),
@@ -187,7 +189,9 @@ void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
 
     d_img.copy_from_host(data, w, h);
 
-    convert(pimpl->img_input, &d_img);
+    pimpl->img_input.resize(w,h);
+
+    convert(&pimpl->img_input, &d_img);
     grayscale(pimpl->img_input_grayscale, &d_img);
 
     // to create textures and setup output buffers

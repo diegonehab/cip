@@ -3,6 +3,7 @@
 
 #include <stdlib.h> // cutil_math needs abs(int) when we're not using nvcc
 #include <cutil_math.h> // for make_typeX
+#include "util.h"
 
 #ifndef HOSTDEV
 #   define HOSTDEV __host__ __device__
@@ -20,19 +21,17 @@ inline uchar4 make_uchar4(const uchar3 &v)
     return make_uchar4(v.x,v.y,v.z,1);
 }
 
-template <class T, int D=1> 
-struct pixel_traits {};
+template <class T, int D=1, class EN=void> 
+struct pixel_traits;
 
 namespace detail/*{{{*/
 {
     template <class T>
-    struct pixel_traits_helper;
-
-    template <>
-    struct pixel_traits_helper<unsigned char>
+    struct pixel_traits_helper
     {
-        typedef unsigned char base_type;
+        typedef T base_type;
         static const int planes = 1;
+        static const bool is_composite = false;
     };
 
     template <>
@@ -40,6 +39,7 @@ namespace detail/*{{{*/
     {
         typedef unsigned char base_type;
         static const int planes = 2;
+        static const bool is_composite = true;
 
     };
 
@@ -48,6 +48,7 @@ namespace detail/*{{{*/
     {
         typedef unsigned char base_type;
         static const int planes = 3;
+        static const bool is_composite = true;
 
     };
 
@@ -56,13 +57,7 @@ namespace detail/*{{{*/
     {
         typedef unsigned char base_type;
         static const int planes = 4;
-    };
-
-    template <>
-    struct pixel_traits_helper<float>
-    {
-        typedef float base_type;
-        static const int planes = 1;
+        static const bool is_composite = true;
     };
 
     template <>
@@ -70,6 +65,7 @@ namespace detail/*{{{*/
     {
         typedef float base_type;
         static const int planes = 2;
+        static const bool is_composite = true;
     };
 
     template <>
@@ -77,6 +73,7 @@ namespace detail/*{{{*/
     {
         typedef float base_type;
         static const int planes = 3;
+        static const bool is_composite = true;
     };
 
     template <>
@@ -84,6 +81,7 @@ namespace detail/*{{{*/
     {
         typedef float base_type;
         static const int planes = 4;
+        static const bool is_composite = true;
     };
 
 
@@ -176,7 +174,9 @@ namespace detail/*{{{*/
 };/*}}}*/
 
 template <class T> 
-struct pixel_traits<T,1> /*{{{*/
+struct pixel_traits<T,1,/*{{{*/
+    typename enable_if<detail::pixel_traits_helper<T>::is_composite &&
+                       !is_const<T>::value && !is_volatile<T>::value>::type>
     : detail::pixtraits_parent<T>::type
 { 
 private:
@@ -212,49 +212,14 @@ public:
     }
 };/*}}}*/
 
-template <class T, int C> 
-struct pixel_traits<const T,C> /*{{{*/
-    : pixel_traits<T,C>
-{ 
-};/*}}}*/
-
-template <class T, int C> 
-struct pixel_traits<volatile T,C> /*{{{*/
-    : pixel_traits<T,C>
-{ 
-};/*}}}*/
-
-template <class T, int C> 
-struct pixel_traits<const volatile T,C> /*{{{*/
-    : pixel_traits<T,C>
-{ 
-};/*}}}*/
-
-// these are for disambiguation
 template <class T> 
-struct pixel_traits<const T> /*{{{*/
-    : pixel_traits<T>
-{ 
-};/*}}}*/
-
-template <class T> 
-struct pixel_traits<volatile T> /*{{{*/
-    : pixel_traits<T>
-{ 
-};/*}}}*/
-
-template <class T> 
-struct pixel_traits<const volatile T> /*{{{*/
-    : pixel_traits<T>
-{ 
-};/*}}}*/
-
-template <> 
-struct pixel_traits<float,1> /*{{{*/
+struct pixel_traits<T,1,/*{{{*/
+    typename enable_if<!detail::pixel_traits_helper<T>::is_composite &&
+                       !is_const<T>::value && !is_volatile<T>::value>::type>
     : detail::assign_helper<float,float,1>
 { 
-    typedef float pixel_type; 
-    typedef float texel_type;
+    typedef T pixel_type; 
+    typedef T texel_type;
     typedef pixel_type base_type;
     static const int planes = 1;
 
@@ -264,11 +229,52 @@ struct pixel_traits<float,1> /*{{{*/
     }
 
     template <class U>
-    HOSTDEV static pixel_type make_pixel(U v)
+    HOSTDEV static 
+    typename enable_if<pixel_traits<U>::is_composite,pixel_type>::type
+        make_pixel(U v)
     {
         return v.x;
     }
 };/*}}}*/
+
+template <class T, int C, class EN> 
+struct pixel_traits<const T,C,EN> /*{{{*/
+    : pixel_traits<T,C>
+{ 
+};/*}}}*/
+
+template <class T, int C, class EN> 
+struct pixel_traits<volatile T,C,EN> /*{{{*/
+    : pixel_traits<T,C>
+{ 
+};/*}}}*/
+
+template <class T, int C, class EN> 
+struct pixel_traits<const volatile T,C,EN> /*{{{*/
+    : pixel_traits<T,C>
+{ 
+};/*}}}*/
+
+#if 0
+// these are for disambiguation
+template <class T, class EN> 
+struct pixel_traits<const T,1,EN> /*{{{*/
+    : pixel_traits<T>
+{ 
+};/*}}}*/
+
+template <class T, class EN> 
+struct pixel_traits<volatile T,1,EN> /*{{{*/
+    : pixel_traits<T>
+{ 
+};/*}}}*/
+
+template <class T, class EN> 
+struct pixel_traits<const volatile T,1,EN> /*{{{*/
+    : pixel_traits<T>
+{ 
+};/*}}}*/
+#endif
 
 template <> 
 struct pixel_traits<float,2> /*{{{*/
@@ -353,27 +359,6 @@ struct pixel_traits<float,4> /*{{{*/
 
 
 template <> 
-struct pixel_traits<char,1> /*{{{*/
-    : detail::assign_helper<unsigned char,unsigned char,1>
-{ 
-    typedef unsigned char pixel_type; 
-    typedef unsigned char texel_type;
-    typedef unsigned char base_type;
-    static const int planes = 1;
-
-    HOSTDEV static pixel_type make_pixel(base_type x)
-    {
-        return x;
-    }
-
-    template <class U>
-    HOSTDEV static pixel_type make_pixel(U v)
-    {
-        return v.x;
-    }
-};/*}}}*/
-
-template <> 
 struct pixel_traits<unsigned char,2> /*{{{*/
     : detail::assign_helper<uchar2,unsigned char,2>
 { 
@@ -453,8 +438,6 @@ struct pixel_traits<unsigned char,4> /*{{{*/
         return make_uchar4(x,y,z,w);
     }
 };/*}}}*/
-
-
 
 template <class T>
 struct texel_traits;

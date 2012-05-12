@@ -155,8 +155,6 @@ void call_filter(dimage_ptr<T,C> out,
                  const filter_operation &op,
                  int flags=0)
 {
-    timer_pool timers;
-
     int imgsize = in.width()*in.height();
 
     base_timer *timerzao = NULL, *timer = NULL;
@@ -597,20 +595,20 @@ int main(int argc, char *argv[])
             int width, height;
             load_image(infile, &imgdata, &width, &height);
 
-
             dimage<uchar3,1> d_img;
             d_img.copy_from_host(imgdata, width, height);
 
             dimage<float,3> d_channels;
 
-            convert(d_channels, &d_img);
+            d_channels.resize(d_img.width(), d_img.height());
+
+            convert(&d_channels, &d_img);
 
             setup_recursive_filter(width, height, d_channels.rowstride());
 
-
             call_filter(&d_channels, &d_channels, op, VERBOSE);
 
-            convert(d_img, &d_channels);
+            convert(&d_img, &d_channels);
 
             d_img.copy_to_host(imgdata);
 

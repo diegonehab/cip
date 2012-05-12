@@ -348,7 +348,8 @@ struct filter_traits<3>
     static void copy_to_array(cudaArray *out, dimage_ptr<float,3> img)
     {
         dimage<float3> temp;
-        convert(temp, img);
+        temp.resize(img.width(), img.height());
+        convert(&temp, img);
 
         cudaMemcpy2DToArray(out, 0, 0, temp, 
                             temp.rowstride()*sizeof(float4),

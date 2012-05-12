@@ -21,8 +21,14 @@ public:
         , m_height(height)
         , m_rowstride(rowstride)
     {
-        
     }
+
+#if 0
+    dimage(dimage_ptr<T,C> ptr)
+    {
+        &*this = ptr;
+    }
+#endif
 
     dimage(int width, int height, int rowstride=0)
     {
@@ -285,6 +291,9 @@ public:
     int height() const { return m_height; }
     HOSTDEV
     int rowstride() const { return m_rowstride; }
+    HOSTDEV
+    int channelstride() const { return rowstride()*height(); } 
+
 
     HOSTDEV
     int offset_at(int x, int y) const
@@ -330,16 +339,16 @@ public:
     }
 
     HOSTDEV
-    operator T*() { return m_data; }
+    operator texel_type*() { return m_data; }
 
     HOSTDEV
-    operator const T*() const { return m_data; }
+    operator const texel_type*() const { return m_data; }
 
     HOSTDEV
-    T *operator&() { return m_data; }
+    texel_type *operator&() { return m_data; }
 
     HOSTDEV
-    const T *operator&() const { return m_data; }
+    const texel_type *operator&() const { return m_data; }
 
     HOSTDEV
     pixel_proxy<C> operator*() 
@@ -395,9 +404,6 @@ public:
 private:
     template <class U, int D>
     friend class dimage_ptr;
-
-    HOSTDEV
-    int channelstride() const { return rowstride()*height(); } 
 
     int m_width, m_height, m_rowstride;
     texel_type *m_data;
