@@ -54,6 +54,24 @@ struct remove_const<const T>
     typedef T type;
 };
 
+template <class T>
+struct remove_volatile
+{
+    typedef T type;
+};
+
+template <class T>
+struct remove_volatile<volatile T>
+{
+    typedef T type;
+};
+
+template <class T>
+struct remove_cv
+{
+    typedef typename remove_const<typename remove_volatile<T>::type>::type type;
+};
+
 template <class T, int N>
 struct array
 {
@@ -142,7 +160,8 @@ struct is_volatile<volatile T>
 template <class T>
 struct is_integral 
 { 
-    static const bool value = std::numeric_limits<T>::is_integer;
+    static const bool value 
+        = std::numeric_limits<typename remove_cv<T>::type>::is_integer;
 };
 
 
