@@ -8,6 +8,18 @@
 #   define HOSTDEV __host__ __device__
 #endif
 
+HOSTDEV
+inline uchar3 make_uchar3(const uchar4 &v)
+{
+    return make_uchar3(v.x,v.y,v.z);
+}
+
+HOSTDEV
+inline uchar4 make_uchar4(const uchar3 &v)
+{
+    return make_uchar4(v.x,v.y,v.z,1);
+}
+
 template <class T, int D=1> 
 struct pixel_traits {};
 
@@ -17,7 +29,7 @@ namespace detail/*{{{*/
     struct pixel_traits_helper;
 
     template <>
-    struct pixel_traits_helper<uchar1>
+    struct pixel_traits_helper<unsigned char>
     {
         typedef unsigned char base_type;
         static const int planes = 1;
@@ -47,7 +59,7 @@ namespace detail/*{{{*/
     };
 
     template <>
-    struct pixel_traits_helper<float1>
+    struct pixel_traits_helper<float>
     {
         typedef float base_type;
         static const int planes = 1;
@@ -76,46 +88,27 @@ namespace detail/*{{{*/
 
 
     template <class T, class B, int C>
-    struct members_helper;
+    struct assign_helper;
 
     template <class T, class B>
-    struct members_helper<T,B,1>
+    struct assign_helper<T,B,1>
     {
-        HOSTDEV static T make(T x)
+        template <class U>
+        HOSTDEV
+        static void assign(B *pix, int stride, const U &data)
         {
-            return x;
+            *pix = pixel_traits<B>::make_pixel(data);
         }
         template <class U>
-        HOSTDEV static T make(U v)
-        {
-            return v.x;
-        }
-
         HOSTDEV
-        static void assign(B *pix, int stride, const T &data)
+        static void assign(U &data, const B *pix, int stride)
         {
-            *pix = data.x;
-        }
-        HOSTDEV
-        static void assign(T &data, const B *pix, int stride)
-        {
-            data.x = *pix;
-        }
-
-        HOSTDEV
-        static void assign(B *pix, int stride, const B &data)
-        {
-            *pix = data;
-        }
-        HOSTDEV
-        static void assign(B &data, const B *pix, int stride)
-        {
-            data = *pix;
+            data = pixel_traits<U>::make_pixel(*pix);
         }
     };
 
     template <class T, class B>
-    struct members_helper<T,B,2>
+    struct assign_helper<T,B,2>
     {
         HOSTDEV
         static void assign(B *pix, int stride, const T &data)
@@ -132,7 +125,7 @@ namespace detail/*{{{*/
     };
 
     template <class T, class B>
-    struct members_helper<T,B,3>
+    struct assign_helper<T,B,3>
     {
         HOSTDEV
         static void assign(B *pix, int stride, const T &data)
@@ -151,7 +144,7 @@ namespace detail/*{{{*/
     };
 
     template <class T, class B>
-    struct members_helper<T,B,4>
+    struct assign_helper<T,B,4>
     {
         HOSTDEV
         static void assign(B *pix, int stride, const T &data)
@@ -187,53 +180,112 @@ struct pixel_traits<T,1> /*{{{*/
     : detail::pixtraits_parent<T>::type
 { 
 private:
+    typedef typename detail::pixtraits_parent<T>::type base;
 public:
-    typedef typename detail::pixtraits_parent<T>::type::type type;
+    typedef typename base::pixel_type pixel_type;
+    typedef typename base::base_type base_type;
+    static const int planes = base::planes;
 
-    HOSTDEV
-    static void assign(type *pix, int stride, const type &data)
+    HOSTDEV static T make_pixel(T x)
     {
-        *pix = data;
+        return x;
     }
-    HOSTDEV
-    static void assign(type &data, const type *pix, int stride)
+
+    template <class U>
+    HOSTDEV static T make_pixel(U v)
     {
-        data = *pix;
+        return pixel_traits<base_type,planes>::make_pixel(v);
+    }
+
+    template <class U>
+    HOSTDEV
+    static void assign(pixel_type *pix, int stride, const U &data)
+    {
+        *pix = make_pixel(data);
+    }
+
+    template <class U>
+    HOSTDEV
+    static void assign(U &data, const pixel_type *pix, int stride)
+    {
+        data = pixel_traits<U>::make_pixel(*pix);
     }
 };/*}}}*/
 
+template <class T, int C> 
+struct pixel_traits<const T,C> /*{{{*/
+    : pixel_traits<T,C>
+{ 
+};/*}}}*/
+
+template <class T, int C> 
+struct pixel_traits<volatile T,C> /*{{{*/
+    : pixel_traits<T,C>
+{ 
+};/*}}}*/
+
+template <class T, int C> 
+struct pixel_traits<const volatile T,C> /*{{{*/
+    : pixel_traits<T,C>
+{ 
+};/*}}}*/
+
+// these are for disambiguation
 template <class T> 
-struct pixel_traits<const T,1> /*{{{*/
-    : pixel_traits<T,1>
+struct pixel_traits<const T> /*{{{*/
+    : pixel_traits<T>
+{ 
+};/*}}}*/
+
+template <class T> 
+struct pixel_traits<volatile T> /*{{{*/
+    : pixel_traits<T>
+{ 
+};/*}}}*/
+
+template <class T> 
+struct pixel_traits<const volatile T> /*{{{*/
+    : pixel_traits<T>
 { 
 };/*}}}*/
 
 template <> 
 struct pixel_traits<float,1> /*{{{*/
-    : detail::members_helper<float1,float,1>
+    : detail::assign_helper<float,float,1>
 { 
-    typedef float type; 
+    typedef float pixel_type; 
     typedef float texel_type;
-    typedef type base_type;
+    typedef pixel_type base_type;
     static const int planes = 1;
+
+    HOSTDEV static pixel_type make_pixel(base_type x)
+    {
+        return x;
+    }
+
+    template <class U>
+    HOSTDEV static pixel_type make_pixel(U v)
+    {
+        return v.x;
+    }
 };/*}}}*/
 
 template <> 
 struct pixel_traits<float,2> /*{{{*/
-    : detail::members_helper<float2,float,2>
+    : detail::assign_helper<float2,float,2>
 { 
-    typedef float2 type; 
+    typedef float2 pixel_type; 
     typedef float2 texel_type;
     typedef float base_type;
     static const int planes = 2;
 
     template <class U>
-    HOSTDEV static type make(U x)
+    HOSTDEV static pixel_type make_pixel(U x)
     {
         return make_float2(x);
     }
     template <class U, class V>
-    HOSTDEV static type make(U x, V y)
+    HOSTDEV static pixel_type make_pixel(U x, V y)
     {
         return make_float2(x,y);
     }
@@ -241,26 +293,26 @@ struct pixel_traits<float,2> /*{{{*/
 
 template <> 
 struct pixel_traits<float,3> /*{{{*/
-    : detail::members_helper<float3,float,3>
+    : detail::assign_helper<float3,float,3>
 { 
-    typedef float3 type; 
+    typedef float3 pixel_type; 
     typedef float4 texel_type;
     typedef float base_type;
     static const int planes = 3;
 
     template <class U>
-    HOSTDEV static type make(U x)
+    HOSTDEV static pixel_type make_pixel(U x)
     {
         return make_float3(x);
     }
     template <class U, class V>
-    HOSTDEV static type make(U x, V y)
+    HOSTDEV static pixel_type make_pixel(U x, V y)
     {
         return make_float3(x,y);
     }
 
     template <class U, class V, class W>
-    HOSTDEV static type make(U x, V y, W z)
+    HOSTDEV static pixel_type make_pixel(U x, V y, W z)
     {
         return make_float3(x,y,z);
     }
@@ -268,32 +320,32 @@ struct pixel_traits<float,3> /*{{{*/
 
 template <> 
 struct pixel_traits<float,4> /*{{{*/
-    : detail::members_helper<float4,float,4>
+    : detail::assign_helper<float4,float,4>
 { 
-    typedef float4 type; 
+    typedef float4 pixel_type; 
     typedef float4 texel_type;
     typedef float base_type;
     static const int planes = 4;
 
     template <class U>
-    HOSTDEV static type make(U x)
+    HOSTDEV static pixel_type make_pixel(U x)
     {
         return make_float4(x);
     }
     template <class U, class V>
-    HOSTDEV static type make(U x, V y)
+    HOSTDEV static pixel_type make_pixel(U x, V y)
     {
         return make_float4(x,y);
     }
 
     template <class U, class V, class W>
-    HOSTDEV static type make(U x, V y, W z)
+    HOSTDEV static pixel_type make_pixel(U x, V y, W z)
     {
         return make_float4(x,y,z);
     }
 
     template <class U, class V, class W, class X>
-    HOSTDEV static type make(U x, V y, W z, X w)
+    HOSTDEV static pixel_type make_pixel(U x, V y, W z, X w)
     {
         return make_float4(x,y,z,w);
     }
@@ -301,31 +353,42 @@ struct pixel_traits<float,4> /*{{{*/
 
 
 template <> 
-struct pixel_traits<unsigned char,1> /*{{{*/
-    : detail::members_helper<uchar1,unsigned char,1>
+struct pixel_traits<char,1> /*{{{*/
+    : detail::assign_helper<unsigned char,unsigned char,1>
 { 
-    typedef uchar1 type; 
-    typedef uchar1 texel_type;
+    typedef unsigned char pixel_type; 
+    typedef unsigned char texel_type;
     typedef unsigned char base_type;
     static const int planes = 1;
+
+    HOSTDEV static pixel_type make_pixel(base_type x)
+    {
+        return x;
+    }
+
+    template <class U>
+    HOSTDEV static pixel_type make_pixel(U v)
+    {
+        return v.x;
+    }
 };/*}}}*/
 
 template <> 
 struct pixel_traits<unsigned char,2> /*{{{*/
-    : detail::members_helper<uchar2,unsigned char,2>
+    : detail::assign_helper<uchar2,unsigned char,2>
 { 
-    typedef uchar2 type; 
+    typedef uchar2 pixel_type; 
     typedef uchar2 texel_type;
     typedef unsigned char base_type;
     static const int planes = 2;
 
     template <class U>
-    HOSTDEV static type make(U x)
+    HOSTDEV static pixel_type make_pixel(U x)
     {
         return make_uchar2(x);
     }
     template <class U, class V>
-    HOSTDEV static type make(U x, V y)
+    HOSTDEV static pixel_type make_pixel(U x, V y)
     {
         return make_uchar2(x,y);
     }
@@ -333,26 +396,26 @@ struct pixel_traits<unsigned char,2> /*{{{*/
 
 template <> 
 struct pixel_traits<unsigned char,3> /*{{{*/
-    : detail::members_helper<uchar3,unsigned char,3>
+    : detail::assign_helper<uchar3,unsigned char,3>
 { 
-    typedef uchar3 type; 
+    typedef uchar3 pixel_type; 
     typedef uchar4 texel_type;
     typedef unsigned char base_type;
     static const int planes = 3;
 
     template <class U>
-    HOSTDEV static type make(U x)
+    HOSTDEV static pixel_type make_pixel(U x)
     {
         return make_uchar3(x);
     }
     template <class U, class V>
-    HOSTDEV static type make(U x, V y)
+    HOSTDEV static pixel_type make_pixel(U x, V y)
     {
         return make_uchar3(x,y);
     }
 
     template <class U, class V, class W>
-    HOSTDEV static type make(U x, V y, W z)
+    HOSTDEV static pixel_type make_pixel(U x, V y, W z)
     {
         return make_uchar3(x,y,z);
     }
@@ -360,36 +423,100 @@ struct pixel_traits<unsigned char,3> /*{{{*/
 
 template <> 
 struct pixel_traits<unsigned char,4> /*{{{*/
-    : detail::members_helper<uchar4,unsigned char,4>
+    : detail::assign_helper<uchar4,unsigned char,4>
 { 
-    typedef uchar4 type; 
+    typedef uchar4 pixel_type; 
     typedef uchar4 texel_type;
     typedef unsigned char base_type;
     static const int planes = 4;
 
     template <class U>
-    HOSTDEV static type make(U x)
+    HOSTDEV static pixel_type make_pixel(U x)
     {
         return make_uchar4(x);
     }
     template <class U, class V>
-    HOSTDEV static type make(U x, V y)
+    HOSTDEV static pixel_type make_pixel(U x, V y)
     {
         return make_uchar4(x,y);
     }
 
     template <class U, class V, class W>
-    HOSTDEV static type make(U x, V y, W z)
+    HOSTDEV static pixel_type make_pixel(U x, V y, W z)
     {
         return make_uchar4(x,y,z);
     }
 
     template <class U, class V, class W, class X>
-    HOSTDEV static type make(U x, V y, W z, X w)
+    HOSTDEV static pixel_type make_pixel(U x, V y, W z, X w)
     {
         return make_uchar4(x,y,z,w);
     }
 };/*}}}*/
 
+
+
+template <class T>
+struct texel_traits;
+
+template <>
+struct texel_traits<float>/*{{{*/
+    : pixel_traits<float>
+{
+    HOSTDEV static float make_texel(float x)
+    {
+        return x;
+    }
+
+    template <class U>
+    HOSTDEV static float make_texel(U v)
+    {
+        return v.x;
+    }
+};/*}}}*/
+
+template <>
+struct texel_traits<float2>/*{{{*/
+    : pixel_traits<float2>
+{
+    template <class U>
+    HOSTDEV static float2 make_texel(U x)
+    {
+        return make_float2(x);
+    }
+    template <class U, class V>
+    HOSTDEV static float2 make_texel(U x, V y)
+    {
+        return make_float2(x,y);
+    }
+};/*}}}*/
+
+template <>
+struct texel_traits<float4>/*{{{*/
+    : pixel_traits<float3>
+{
+    template <class U>
+    HOSTDEV static float4 make_texel(U x)
+    {
+        return make_float4(x);
+    }
+    template <class U, class V>
+    HOSTDEV static float4 make_texel(U x, V y)
+    {
+        return make_float4(x,y);
+    }
+
+    template <class U, class V, class W>
+    HOSTDEV static float4 make_texel(U x, V y, W z)
+    {
+        return make_float4(x,y,z);
+    }
+
+    template <class U, class V, class W, class X>
+    HOSTDEV static float4 make_texel(U x, V y, W z, X w)
+    {
+        return make_float4(x,y,z,w);
+    }
+};/*}}}*/
 
 #endif

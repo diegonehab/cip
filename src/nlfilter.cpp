@@ -598,7 +598,7 @@ int main(int argc, char *argv[])
             load_image(infile, &imgdata, &width, &height);
 
 
-            dimage<uchar4,1> d_img;
+            dimage<uchar3,1> d_img;
             d_img.copy_from_host(imgdata, width, height);
 
             dimage<float,3> d_channels;

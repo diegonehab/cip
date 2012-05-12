@@ -27,7 +27,7 @@ struct ImageFrame::impl
     dimage<float,3> img_input, img_buffer, img_backbuffer;
     dimage<float,1> img_input_grayscale;
 
-    dimage<float4> temp_buffer;
+    dimage<float3> temp_buffer;
 
     bool must_update_texture;
 
@@ -183,7 +183,7 @@ void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
     if(!pimpl->gl_ok)
         pimpl->initgl();
 
-    dimage<uchar4> d_img;
+    dimage<uchar3> d_img;
 
     d_img.copy_from_host(data, w, h);
 

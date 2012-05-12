@@ -92,5 +92,17 @@ public:
     const T *const&operator[](int i) const { return m_data[i]; }
 };
 
+template <class FROM, class TO>
+struct copy_const
+{
+    typedef TO type;
+};
+
+template <class FROM, class TO>
+struct copy_const<const FROM, TO>
+{
+    typedef const TO type;
+};
+
 
 #endif

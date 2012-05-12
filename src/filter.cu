@@ -64,12 +64,20 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 template <int C>
 struct filter_traits {};
 
+template <int C>
+struct sum_traits
+    : pixel_traits<float,C+1>
+{
+    typedef typename pixel_traits<float,C+1>::pixel_type type;
+};
+
+
 template <effect_type OP,int C>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
 #endif
-void filter_kernel1(dimage_ptr<typename pixel_traits<float,C+1>::type,KS*KS> out)/*{{{*/
+void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -88,9 +96,8 @@ void filter_kernel1(dimage_ptr<typename pixel_traits<float,C+1>::type,KS*KS> out
     
     typedef filter_traits<C> cfg;
 
-    typedef pixel_traits<float,C+1> sum_traits;
-    typedef typename sum_traits::type sum_type;
-    typedef typename pixel_traits<float,C>::type pixel_type;
+    typedef typename sum_traits<C>::type sum_type;
+    typedef typename pixel_traits<float,C>::pixel_type pixel_type;
 
     const int SMEM_SIZE = cfg::smem_size,
               REG_SIZE = KS*KS-SMEM_SIZE;
@@ -102,11 +109,11 @@ void filter_kernel1(dimage_ptr<typename pixel_traits<float,C+1>::type,KS*KS> out
 
     // Init registers to zero
     for(int i=0; i<REG_SIZE; ++i)
-        sum[i] = sum_traits::make(0);
+        sum[i] = sum_traits<C>::make_pixel(0);
 
 #pragma unroll
     for(int i=0; i<SMEM_SIZE; ++i)
-        *ssum[i] = sum_traits::make(0);
+        *ssum[i] = sum_traits<C>::make_pixel(0);
 
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f+0.5f;
@@ -125,7 +132,7 @@ void filter_kernel1(dimage_ptr<typename pixel_traits<float,C+1>::type,KS*KS> out
         {
             float wij = bspline3[i];
 
-            *ssum[i] += sum_traits::make(value*wij, wij);
+            *ssum[i] += sum_traits<C>::make_pixel(value*wij, wij);
         }
         bspline3 += SMEM_SIZE;
 #pragma unroll
@@ -133,7 +140,7 @@ void filter_kernel1(dimage_ptr<typename pixel_traits<float,C+1>::type,KS*KS> out
         {
             float wij = bspline3[i];
 
-            sum[i] += sum_traits::make(value*wij, wij);
+            sum[i] += sum_traits<C>::make_pixel(value*wij, wij);
         }
         bspline3 += REG_SIZE;
     }
@@ -154,7 +161,7 @@ __global__
 __launch_bounds__(BW_F2*BH_F2, NB_F2)
 #endif
 void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
-                    dimage_ptr<const typename pixel_traits<float,C+1>::type,KS*KS> in)
+                    dimage_ptr<const typename sum_traits<C>::type,KS*KS> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -173,10 +180,8 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
     int mi = min(y+KS,in.height())-y,
         mj = min(x+KS,in.width())-x;
 
-    typedef pixel_traits<float,C+1> sum_traits;
-
     // sum the contribution of nearby pixels
-    typename sum_traits::type sum = sum_traits::make(0);
+    typename sum_traits<C>::type sum = sum_traits<C>::make_pixel(0);
 
 #pragma unroll
     for(int i=0; i<mi; ++i)
@@ -198,7 +203,7 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
 {
     typedef filter_traits<C> cfg;
     typedef typename pixel_traits<float,C>::texel_type texel_type;
-    typedef typename pixel_traits<float,C+1>::type sum_type;
+    typedef typename sum_traits<C>::type sum_type;
 
     // copy the input data to a texture
     cudaArray *a_in;
@@ -342,7 +347,7 @@ struct filter_traits<3>
 
     static void copy_to_array(cudaArray *out, dimage_ptr<float,3> img)
     {
-        dimage<float4> temp;
+        dimage<float3> temp;
         convert(temp, img);
 
         cudaMemcpy2DToArray(out, 0, 0, temp, 

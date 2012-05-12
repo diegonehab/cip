@@ -20,7 +20,7 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert(dimage_ptr<float4,1> out, dimage_ptr<const float,3> in)
+void convert(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -33,14 +33,14 @@ void convert(dimage_ptr<float4,1> out, dimage_ptr<const float,3> in)
     in += idx;
     out += idx;
 
-    *out = make_float4(*in[0],*in[1],*in[2],1);;
+    *out = *in;
 }
 
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert(dimage_ptr<uchar4,1> out, dimage_ptr<const float,3> in)
+void convert(dimage_ptr<uchar3,1> out, dimage_ptr<const float,3> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -53,15 +53,15 @@ void convert(dimage_ptr<uchar4,1> out, dimage_ptr<const float,3> in)
     in += idx;
     out += idx;
 
-    float3 v = saturate(make_float3(*in[0],*in[1],*in[2]))*255.0f;
-    *out = make_uchar4(v.x,v.y,v.z,1);
+    float3 v = saturate(*in)*255.0f;
+    *out = make_uchar3(v.x,v.y,v.z);
 }
 
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert(dimage_ptr<float,3> out, dimage_ptr<const float4,1> in)
+void convert(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -74,18 +74,14 @@ void convert(dimage_ptr<float,3> out, dimage_ptr<const float4,1> in)
     in += idx;
     out += idx;
 
-    float4 v = *in;
-
-    *out[0] = v.x;
-    *out[1] = v.y;
-    *out[2] = v.z;
+    *out = *in;
 }
 
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar4,1> in)
+void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -98,7 +94,7 @@ void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar4,1> in)
     in += idx;
     out += idx;
 
-    uchar4 v = *in;
+    uchar3 v = *in;
     *out = make_float3(v.x/255.0,v.y/255.0,v.z/255.0);
 }
 
@@ -113,20 +109,20 @@ void call_convert(dimage<T,CT> &out, dimage_ptr<const U,CU> in)
     convert<<<gdim, bdim>>>(&out, in);
 }
 
-void convert(dimage<float4,1> &out, dimage_ptr<const float,3> in)
+void convert(dimage<float3,1> &out, dimage_ptr<const float,3> in)
 {
     call_convert(out, in);
 }
-void convert(dimage<uchar4,1> &out, dimage_ptr<const float,3> in)
+void convert(dimage<uchar3,1> &out, dimage_ptr<const float,3> in)
 {
     call_convert(out, in);
 }
 
-void convert(dimage<float,3> &out, dimage_ptr<const float4,1> in)
+void convert(dimage<float,3> &out, dimage_ptr<const float3,1> in)
 {
     call_convert(out, in);
 }
-void convert(dimage<float,3> &out, dimage_ptr<const uchar4,1> in)
+void convert(dimage<float,3> &out, dimage_ptr<const uchar3,1> in)
 {
     call_convert(out, in);
 }
@@ -137,7 +133,7 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void grayscale(dimage_ptr<float,1> out, dimage_ptr<const uchar4,1> in)
+void grayscale(dimage_ptr<float,1> out, dimage_ptr<const uchar3,1> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -150,7 +146,7 @@ void grayscale(dimage_ptr<float,1> out, dimage_ptr<const uchar4,1> in)
     in += idx;
     out += idx;
 
-    uchar4 p = *in;
+    uchar3 p = *in;
     *out = p.x/255.0f*0.2126f + p.y/255.0f*0.7152f + p.z/255.0f*0.0722f;
 }
 
@@ -158,7 +154,7 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float4,1> in)
+void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float3,1> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -169,7 +165,7 @@ void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float4,1> in)
 
     int idx = in.offset_at(x,y);
 
-    float4 p = *in;
+    float3 p = *in;
     *out = p.x*0.2126f + p.y*0.7152f + p.z*0.0722f;
 }
 
@@ -185,12 +181,12 @@ void call_grayscale(dimage<float,1> &out, dimage_ptr<const T,1> in)
 }
 
 
-void grayscale(dimage<float,1> &out, dimage_ptr<const float4,1> in)
+void grayscale(dimage<float,1> &out, dimage_ptr<const float3,1> in)
 {
     call_grayscale(out, in);
 }
 
-void grayscale(dimage<float,1> &out, dimage_ptr<const uchar4,1> in)
+void grayscale(dimage<float,1> &out, dimage_ptr<const uchar3,1> in)
 {
     call_grayscale(out, in);
 }

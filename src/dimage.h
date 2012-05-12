@@ -13,7 +13,9 @@ template <class T, int C=1>
 class dimage
 {
 public:
-    dimage(T *data, int width, int height, int rowstride)
+    typedef typename pixel_traits<T,1>::texel_type texel_type;
+
+    dimage(texel_type *data, int width, int height, int rowstride)
         : m_data(data, rowstride*height)
         , m_width(width)
         , m_height(height)
@@ -31,7 +33,7 @@ public:
     {
     }
 
-    void reset(T *data, int width, int height, int rowstride)
+    void reset(texel_type *data, int width, int height, int rowstride)
     {
         m_width = width;
         m_height = height;
@@ -47,38 +49,40 @@ public:
         m_data.reset(data, m_rowstride*m_height*C);
     }
 
-    void copy_to_host(T *out) const
+    void copy_to_host(texel_type *out) const
     {
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(out+width()*height()*i, width()*sizeof(T), 
-                         &m_data+i*channelstride(), rowstride()*sizeof(T), 
-                         width()*sizeof(T), height(), cudaMemcpyDeviceToHost);
+            cudaMemcpy2D(out+width()*height()*i, width()*sizeof(texel_type), 
+                         &m_data+i*channelstride(), 
+                         rowstride()*sizeof(texel_type), 
+                         width()*sizeof(texel_type), height(), 
+                         cudaMemcpyDeviceToHost);
         }
 
         check_cuda_error("Error during memcpy from device to host");
     }
 
-    void copy_to_host(std::vector<T> &out) const
+    void copy_to_host(std::vector<texel_type> &out) const
     {
         out.resize(width()*height());
         copy_to_host(&out[0]);
     }
 
-    void copy_from_host(const T *in, int width, int height, int rowstride=0)
+    void copy_from_host(const texel_type *in, int w, int h, int rs=0)
     {
-        resize(width, height, rowstride);
+        resize(w, h, rs);
 
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(&m_data+i*channelstride(), this->rowstride()*sizeof(T), 
-                         in+i*this->width()*this->height(), this->width()*sizeof(T), 
-                         this->width()*sizeof(T), this->height(), cudaMemcpyHostToDevice);
+            cudaMemcpy2D(&m_data+i*channelstride(), rowstride()*sizeof(texel_type), 
+                         in+i*width()*height(), width()*sizeof(texel_type), 
+                         width()*sizeof(texel_type), height(), cudaMemcpyHostToDevice);
         }
 
         check_cuda_error("Error during memcpy from host to device");
     }
-    void copy_from_host(const std::vector<T> &in, 
+    void copy_from_host(const std::vector<texel_type> &in, 
                         int width, int height, int rowstride=0)
     {
         assert(in.size() == width*height);
@@ -108,15 +112,15 @@ public:
         return m_data.empty();
     }
 
-    dimage &operator=(const dimage_ptr<const T, C> &img)
+    dimage &operator=(const dimage_ptr<const texel_type, C> &img)
     {
         resize(img.width(), img.height(), img.rowstride());
 
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(&m_data+channelstride(), rowstride()*sizeof(T), 
-                         &img+i*img.channelstride(), rowstride()*sizeof(T), 
-                         width()*sizeof(T), height(), cudaMemcpyDeviceToDevice);
+            cudaMemcpy2D(&m_data+channelstride(),rowstride()*sizeof(texel_type), 
+                         &img+i*img.channelstride(), rowstride()*sizeof(texel_type), 
+                         width()*sizeof(texel_type), height(), cudaMemcpyDeviceToDevice);
         }
 
         return *this;
@@ -140,8 +144,8 @@ public:
     dimage_ptr<T,C> operator&();
     dimage_ptr<const T,C> operator&() const;
 
-    operator T*() { return m_data; }
-    operator const T*() const { return m_data; }
+    operator texel_type*() { return m_data; }
+    operator const texel_type*() const { return m_data; }
 
     int offset_at(int x, int y) const { return y*rowstride()+x; }
     bool is_inside(int x, int y) const 
@@ -152,13 +156,17 @@ public:
     dimage_ptr<const T, 1> operator[](int i) const;
 
 private:
-    dvector<T> m_data;
+    dvector<texel_type> m_data;
     int m_width, m_height, m_rowstride;
 };
 
 template <class T, int C>
 class dimage_ptr
 {
+public:
+    typedef typename copy_const<T,typename pixel_traits<T,1>::texel_type>::type texel_type;
+private:
+
     template <int D, class EN = void>
     class pixel_proxy/*{{{*/
     {
@@ -168,19 +176,19 @@ class dimage_ptr
         HOSTDEV
         pixel_proxy(dimage_ptr &img): m_img(img) {}
 
-        typedef typename pixel_traits<T,D>::type value_type;
+        typedef typename pixel_traits<T,C>::pixel_type value_type;
 
         HOSTDEV
         pixel_proxy &operator=(const pixel_proxy &p)
         {
-            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), p);
+            pixel_traits<texel_type,D>::assign(m_img.m_data, m_img.channelstride(), p);
             return *this;
         }
 
         HOSTDEV
         pixel_proxy &operator=(const value_type &v)
         {
-            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), v);
+            pixel_traits<texel_type,D>::assign(m_img.m_data, m_img.channelstride(), v);
             return *this;
         }
 
@@ -188,9 +196,9 @@ class dimage_ptr
         pixel_proxy &operator+=(const value_type &v)
         {
             value_type temp;
-            pixel_traits<T,D>::assign(temp, m_img.m_data, m_img.channelstride());
+            pixel_traits<texel_type,D>::assign(temp, m_img.m_data, m_img.channelstride());
             temp += v;
-            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), temp);
+            pixel_traits<texel_type,D>::assign(m_img.m_data, m_img.channelstride(), temp);
             return *this;
         }
 
@@ -198,9 +206,9 @@ class dimage_ptr
         pixel_proxy &operator-=(const value_type &v)
         {
             value_type temp;
-            pixel_traits<T,D>::assign(temp, m_img.m_data, m_img.channelstride());
+            pixel_traits<texel_type,D>::assign(temp, m_img.m_data, m_img.channelstride());
             temp -= v;
-            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), temp);
+            pixel_traits<texel_type,D>::assign(m_img.m_data, m_img.channelstride(), temp);
             return *this;
         }
 
@@ -208,7 +216,7 @@ class dimage_ptr
         operator value_type() const
         {
             value_type val;
-            pixel_traits<T,D>::assign(val, m_img.m_data, m_img.channelstride());
+            pixel_traits<texel_type,D>::assign(val, m_img.m_data, m_img.channelstride());
             return val;
         }
 
@@ -233,7 +241,7 @@ class dimage_ptr
         HOSTDEV
         const_pixel_proxy(const dimage_ptr &img) : m_img(img) {}
 
-        typedef typename pixel_traits<T,D>::type value_type;
+        typedef typename pixel_traits<T,C>::pixel_type value_type;
 
         HOSTDEV
         operator value_type() const
@@ -255,7 +263,7 @@ class dimage_ptr
 
 public:
     HOSTDEV
-    dimage_ptr(T *data, int width, int height, int rowstride)
+    dimage_ptr(texel_type *data, int width, int height, int rowstride)
         : m_width(width), m_height(height), m_rowstride(rowstride)
         , m_data(data)
     {
@@ -293,9 +301,11 @@ public:
 
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(&m_data+channelstride(), width()*sizeof(T), 
-                         &img+i*img.channelstride(), rowstride()*sizeof(T), 
-                         width()*sizeof(T), height(), cudaMemcpyDeviceToDevice);
+            cudaMemcpy2D(&m_data+channelstride(), width()*sizeof(texel_type), 
+                         &img+i*img.channelstride(), 
+                         rowstride()*sizeof(texel_type), 
+                         width()*sizeof(texel_type), height(), 
+                         cudaMemcpyDeviceToDevice);
         }
         return *this;
     }
@@ -390,7 +400,7 @@ private:
     int channelstride() const { return rowstride()*height(); } 
 
     int m_width, m_height, m_rowstride;
-    T *m_data;
+    texel_type *m_data;
 };
 
 template <class T, int C>
