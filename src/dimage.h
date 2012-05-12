@@ -4,87 +4,7 @@
 #include <cassert>
 #include "dvector.h"
 #include "util.h"
-
-#ifndef HOSTDEV
-#   define HOSTDEV __host__ __device__
-#endif
-
-template <class T, int D> 
-struct pixel_traits {};
-
-template <class T> 
-struct pixel_traits<T,1> 
-{ 
-    typedef typename remove_const<T>::type type; 
-
-    HOSTDEV
-    static void assign(type *pix, int stride, const type &data)
-    {
-        *pix = data;
-    }
-    HOSTDEV
-    static void assign(type &data, const type *pix, int stride)
-    {
-        data = *pix;
-    }
-};
-
-template <> 
-struct pixel_traits<float,2> 
-{ 
-    typedef float2 type; 
-
-    HOSTDEV
-    static void assign(float *pix, int stride, const type &data)
-    {
-        pix[0] = data.x;
-        pix[stride] = data.y;
-    }
-    HOSTDEV
-    static void assign(type &data, const float *pix, int stride)
-    {
-        data.x = pix[0];
-        data.y = pix[stride];
-    }
-};
-template <> struct pixel_traits<float,3> 
-{ 
-    typedef float3 type; 
-    HOSTDEV
-    static void assign(float *pix, int stride, const type &data)
-    {
-        pix[0] = data.x;
-        pix[stride] = data.y;
-        pix[stride*2] = data.z;
-    }
-    HOSTDEV
-    static void assign(type &data, const float *pix, int stride)
-    {
-        data.x = pix[0];
-        data.y = pix[stride];
-        data.z = pix[stride*2];
-    }
-};
-template <> struct pixel_traits<float,4> 
-{ 
-    typedef float4 type; 
-    HOSTDEV
-    static void assign(float *pix, int stride, const type &data)
-    {
-        pix[0] = data.x;
-        pix[stride] = data.y;
-        pix[stride*2] = data.z;
-        pix[stride*3] = data.w;
-    }
-    HOSTDEV
-    static void assign(type &data, const float *pix, int stride)
-    {
-        data.x = pix[0];
-        data.y = pix[stride];
-        data.z = pix[stride*2];
-        data.w = pix[stride*3];
-    }
-};
+#include "pixel_traits.h"
 
 template <class T, int C=1>
 class dimage_ptr;
@@ -249,6 +169,13 @@ class dimage_ptr
         pixel_proxy(dimage_ptr &img): m_img(img) {}
 
         typedef typename pixel_traits<T,D>::type value_type;
+
+        HOSTDEV
+        pixel_proxy &operator=(const pixel_proxy &p)
+        {
+            pixel_traits<T,D>::assign(m_img.m_data, m_img.channelstride(), p);
+            return *this;
+        }
 
         HOSTDEV
         pixel_proxy &operator=(const value_type &v)

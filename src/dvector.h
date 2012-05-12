@@ -8,6 +8,7 @@
 #ifndef DVECTOR_H
 #define DVECTOR_H
 
+
 //== INCLUDES =================================================================
 
 #include <vector>

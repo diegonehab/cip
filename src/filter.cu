@@ -69,7 +69,7 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
 #endif
-void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*{{{*/
+void filter_kernel1(dimage_ptr<typename pixel_traits<float,C+1>::type,KS*KS> out)/*{{{*/
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -88,9 +88,10 @@ void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*
     
     typedef filter_traits<C> cfg;
 
-    typedef typename cfg::sum_type sum_type;
-    typedef typename cfg::pixel_type pixel_type;
-    
+    typedef pixel_traits<float,C+1> sum_traits;
+    typedef typename sum_traits::type sum_type;
+    typedef typename pixel_traits<float,C>::type pixel_type;
+
     const int SMEM_SIZE = cfg::smem_size,
               REG_SIZE = KS*KS-SMEM_SIZE;
 
@@ -101,11 +102,11 @@ void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*
 
     // Init registers to zero
     for(int i=0; i<REG_SIZE; ++i)
-        sum[i] = cfg::make_sum(0);
+        sum[i] = sum_traits::make(0);
 
 #pragma unroll
     for(int i=0; i<SMEM_SIZE; ++i)
-        *ssum[i] = cfg::make_sum(0);
+        *ssum[i] = sum_traits::make(0);
 
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f+0.5f;
@@ -124,7 +125,7 @@ void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*
         {
             float wij = bspline3[i];
 
-            *ssum[i] += cfg::make_sum(value*wij, wij);
+            *ssum[i] += sum_traits::make(value*wij, wij);
         }
         bspline3 += SMEM_SIZE;
 #pragma unroll
@@ -132,7 +133,7 @@ void filter_kernel1(dimage_ptr<typename filter_traits<C>::sum_type,KS*KS> out)/*
         {
             float wij = bspline3[i];
 
-            sum[i] += cfg::make_sum(value*wij, wij);
+            sum[i] += sum_traits::make(value*wij, wij);
         }
         bspline3 += REG_SIZE;
     }
@@ -153,7 +154,7 @@ __global__
 __launch_bounds__(BW_F2*BH_F2, NB_F2)
 #endif
 void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
-                    dimage_ptr<const typename filter_traits<C>::sum_type,KS*KS> in)
+                    dimage_ptr<const typename pixel_traits<float,C+1>::type,KS*KS> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -172,10 +173,10 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
     int mi = min(y+KS,in.height())-y,
         mj = min(x+KS,in.width())-x;
 
-    typedef filter_traits<C> cfg;
+    typedef pixel_traits<float,C+1> sum_traits;
 
     // sum the contribution of nearby pixels
-    typename cfg::sum_type sum = cfg::make_sum(0);
+    typename sum_traits::type sum = sum_traits::make(0);
 
 #pragma unroll
     for(int i=0; i<mi; ++i)
@@ -189,19 +190,20 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
         in += in.rowstride()-mj;
     }
 
-    *out = cfg::normalize_sum(sum);
+    *out = filter_traits<C>::normalize_sum(sum);
 }/*}}}*/
 
 template <int C>
 void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
 {
     typedef filter_traits<C> cfg;
-    typedef typename cfg::texel_type texel_type;
+    typedef typename pixel_traits<float,C>::texel_type texel_type;
+    typedef typename pixel_traits<float,C+1>::type sum_type;
 
     // copy the input data to a texture
     cudaArray *a_in;
     cudaChannelFormatDesc ccd 
-        = cudaCreateChannelDesc<typename cfg::texel_type>();
+        = cudaCreateChannelDesc<texel_type>();
 
     cudaMallocArray(&a_in, &ccd, img.width(), img.height());
 
@@ -216,7 +218,7 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
 
     copy_to_symbol("filter_op",op);
 
-    dimage<typename cfg::sum_type, KS*KS> temp(img.width(), img.height());
+    dimage<sum_type, KS*KS> temp(img.width(), img.height());
 
     dim3 bdim(BW_F1,BH_F1),
          gdim((img.width()+bdim.x-1)/bdim.x, (img.height()+bdim.y-1)/bdim.y);
@@ -278,48 +280,25 @@ template <>
 struct filter_traits<1>
 {
     typedef texfetch_gray texfetch_type;
-    typedef float texel_type;
-    typedef float2 sum_type;
-    typedef float pixel_type;
     static const int smem_size = 3;
 
     static 
-    texture<texel_type,2,cudaReadModeElementType> &tex() { return t_in_gray; }
+    texture<float,2,cudaReadModeElementType> &tex() { return t_in_gray; }
 
     static void copy_to_array(cudaArray *out, dimage_ptr<float> in)
     {
         cudaMemcpy2DToArray(out, 0, 0, in, 
-                            in.rowstride()*sizeof(texel_type),
-                            in.width()*sizeof(texel_type), in.height(),
+                            in.rowstride()*sizeof(float),
+                            in.width()*sizeof(float), in.height(),
                             cudaMemcpyDeviceToDevice);
     }
 
-    __device__ static pixel_type sample(float x, float y)
+    __device__ static float sample(float x, float y)
     {
         return tex2D(t_in_gray, x, y);
     }
 
-    __device__ static sum_type make_sum(float v)
-    {
-        return make_float2(v);
-    }
-
-    __device__ static sum_type make_sum(pixel_type p, float w)
-    {
-        return make_float2(p, w);
-    }
-
-    __device__ static void output_sum(float *out, int imgstride, sum_type s)
-    {
-        out[0] = s.x;
-        out[imgstride] = s.y;
-    }
-    __device__ static sum_type input_sum(const float *in, int imgstride)
-    {
-        return make_float2(in[0], in[imgstride]);
-    }
-
-    __device__ static pixel_type normalize_sum(sum_type sum)
+    __device__ static float normalize_sum(float2 sum)
     {
         return sum.x / sum.y;
     }
@@ -356,49 +335,23 @@ template <>
 struct filter_traits<3>
 {
     typedef texfetch_rgba texfetch_type;
-    typedef float4 sum_type;
-    typedef float4 texel_type;
-    typedef float3 pixel_type;
     static const int smem_size = 5;
 
-    static texture<texel_type,2,cudaReadModeElementType> &tex() 
+    static texture<float4,2,cudaReadModeElementType> &tex() 
         { return t_in_rgba; }
 
     static void copy_to_array(cudaArray *out, dimage_ptr<float,3> img)
     {
-        dimage<texel_type> temp;
+        dimage<float4> temp;
         convert(temp, img);
 
         cudaMemcpy2DToArray(out, 0, 0, temp, 
-                            temp.rowstride()*sizeof(texel_type),
-                            temp.width()*sizeof(texel_type), temp.height(),
+                            temp.rowstride()*sizeof(float4),
+                            temp.width()*sizeof(float4), temp.height(),
                             cudaMemcpyDeviceToDevice);
     }
 
-    __device__ static sum_type make_sum(float v)
-    {
-        return make_float4(v);
-    }
-
-    __device__ static sum_type make_sum(pixel_type p, float w)
-    {
-        return make_float4(p, w);
-    }
-
-    __device__ static void output_sum(float *out, int imgstride, sum_type s)
-    {
-        out[0] = s.x;
-        out[imgstride] = s.y;
-        out[imgstride*2] = s.z;
-        out[imgstride*3] = s.w;
-    }
-    __device__ static sum_type input_sum(const float *in, int imgstride)
-    {
-        return make_float4(in[0], in[imgstride], 
-                           in[imgstride*2],in[imgstride*3]);
-    }
-
-    __device__ static pixel_type normalize_sum(sum_type sum)
+    __device__ static float3 normalize_sum(float4 sum)
     {
         return make_float3(sum) / sum.w;
     }

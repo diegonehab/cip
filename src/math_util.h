@@ -2,6 +2,7 @@
 #define NLFILTER_MATH_UTIL_H
 
 #include <cutil_math.h>
+#include <device_functions.h>
 
 __device__ inline float3 saturate(float3 v)
 {
@@ -32,6 +33,5 @@ __device__ inline float3 sqrt(float3 v)
 {
     return make_float3(sqrt(v.x),sqrt(v.y),sqrt(v.z));
 }
-
 
 #endif
