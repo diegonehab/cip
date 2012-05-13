@@ -235,6 +235,8 @@ void *MainFrame::render_thread(MainFrame *frame)
                 op.degree = panel->degree->value();
             else if(const ParamThresholdUI *panel = dynamic_cast<const ParamThresholdUI *>(frame->m_param_panel))
                 op.threshold = panel->threshold->value();
+            else if(const ParamLaplaceEdgeEnhancementUI *panel = dynamic_cast<const ParamLaplaceEdgeEnhancementUI *>(frame->m_param_panel))
+                op.multiple = panel->multiple->value();
             else if(const ParamReplacementUI *panel = dynamic_cast<const ParamReplacementUI *>(frame->m_param_panel))
             {
                 unsigned char r,g,b;
