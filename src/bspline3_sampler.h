@@ -49,6 +49,33 @@ public:
     {
         S sampler;
 
+        float2 index = floor(pos-0.5f);
+        float2 alpha = pos - index;
+
+        float2 w0, w1, w2, w3;
+
+        bspline3_weights(alpha.x, w0.x, w1.x, w2.x, w3.x, kx);
+        bspline3_weights(alpha.y, w0.y, w1.y, w2.y, w3.y, ky);
+
+        float2 g0 = w0 + w1,
+               g1 = w2 + w3,
+              // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
+               h0 = (w1 / g0) - 0.5f + index,
+               h1 = (w3 / g1) + 1.5f + index;
+
+        // fetch the four linear
+        result_type tex00 = sampler(h0.x, h0.y),
+                    tex10 = sampler(h1.x, h0.y),
+                    tex01 = sampler(h0.x, h1.y),
+                    tex11 = sampler(h1.x, h1.y);
+
+        // weigh along the y-direction
+        tex00 = g0.y*tex00 + g1.y*tex01;
+        tex10 = g0.y*tex10 + g1.y*tex11;
+
+        // weigh along the x-direction
+        return g0.x*tex00 + g1.x*tex10;
+#if 0
         if(kx<2 && ky<2)
         {
             float2 index = floor(pos-0.5f);
@@ -187,6 +214,7 @@ public:
             // weigh along the x-direction
             return tex00-2*tex10+tex20;
         }
+#endif
     }
 };
 
