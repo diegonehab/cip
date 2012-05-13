@@ -46,13 +46,13 @@ public:
 
 
     __device__ inline 
-    result_type operator()(float2 coord_grid, int kx=0, int ky=0) const
+    result_type operator()(float2 pos, int kx=0, int ky=0) const
     {
         // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
-    //    float2 coord_grid = make_float2(x-0.5f,y-0.5f);
-        float2 index = floor(coord_grid-0.5f);
+    //    float2 pos = make_float2(x-0.5f,y-0.5f);
+        float2 index = floor(pos-0.5f);
 
-        float2 alpha = coord_grid - index;
+        float2 alpha = pos - index;
 
         float2 w0, w1, w2, w3;
 
