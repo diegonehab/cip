@@ -44,16 +44,14 @@ public:
     typedef S sampler_type;
     typedef typename S::result_type result_type;
 
-
     __device__ inline 
     result_type operator()(float2 pos, int kx=0, int ky=0) const
     {
         S sampler;
 
-        if(kx!=2 && ky != 2)
+        if(kx<2 && ky<2)
         {
             float2 index = floor(pos-0.5f);
-
             float2 alpha = pos - index;
 
             float2 w0, w1, w2, w3;
@@ -92,21 +90,102 @@ public:
             else
                 return (tex10 - tex00)*g0.x;
         }
-        else if(kx == 2)
+        else if(kx == 2 && ky < 2)
         {
-            result_type tex0 = sampler(pos.x-1, pos.y),
-                        tex1 = sampler(pos.x, pos.y),
-                        tex2 = sampler(pos.x+1, pos.y);
+            float index = floor(pos.y-0.5f);
+            float alpha = pos.y - index;
 
-            return tex0-2*tex1+tex2;
+            float w0, w1, w2, w3;
+
+            bspline3_weights(alpha, w0, w1, w2, w3, ky);
+
+            float g0 = w0 + w1,
+                  g1 = w2 + w3,
+                  // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
+                  h0 = (w1 / g0) - 0.5f + index,
+                  h1 = (w3 / g1) + 1.5f + index;
+
+            // fetch the six linear
+            result_type tex00 = sampler(pos.x-1, h0),
+                        tex10 = sampler(pos.x, h0),
+                        tex20 = sampler(pos.x+1, h0),
+
+                        tex01 = sampler(pos.x-1, h1),
+                        tex11 = sampler(pos.x, h1),
+                        tex21 = sampler(pos.x+1, h1);
+
+            // weigh along the y-direction
+            if(ky == 0)
+            {
+                tex00 = lerp(tex01, tex00, g0);
+                tex10 = lerp(tex11, tex10, g0);
+                tex20 = lerp(tex21, tex20, g0);
+            }
+            else
+            {
+                tex00 = (tex00 - tex01)*g0;
+                tex10 = (tex10 - tex11)*g0;
+                tex20 = (tex20 - tex21)*g0;
+            }
+
+            // weigh along the x-direction
+            return tex00-2*tex10+tex20;
         }
-        else 
+        else if(ky == 2 && kx < 2)
         {
-            result_type tex0 = sampler(pos.x, pos.y-1),
-                        tex1 = sampler(pos.x, pos.y),
-                        tex2 = sampler(pos.x, pos.y+1);
+            float index = floor(pos.x-0.5f);
+            float alpha = pos.x - index;
 
-            return tex0-2*tex1+tex2;
+            float w0, w1, w2, w3;
+
+            bspline3_weights(alpha, w0, w1, w2, w3, kx);
+
+            float g0 = w0 + w1,
+                  g1 = w2 + w3,
+                  // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
+                  h0 = (w1 / g0) - 0.5f + index,
+                  h1 = (w3 / g1) + 1.5f + index;
+
+            // fetch the six linear
+            result_type tex00 = sampler(h0, pos.y-1),
+                        tex01 = sampler(h0, pos.y ),
+                        tex02 = sampler(h0, pos.y+1),
+
+                        tex10 = sampler(h1, pos.y-1),
+                        tex11 = sampler(h1, pos.y),
+                        tex12 = sampler(h1, pos.y+1);
+
+            // weigh along the y-direction
+            tex00 = tex00-2*tex01+tex02;
+            tex10 = tex10-2*tex11+tex12;
+
+            // weigh along the x-direction
+            if(kx == 0)
+                return lerp(tex10, tex00, g0);
+            else
+                return (tex10 - tex00)*g0;
+        }
+        else
+        {
+            result_type tex00 = sampler(pos.x-1, pos.y-1),
+                        tex01 = sampler(pos.x-1, pos.y ),
+                        tex02 = sampler(pos.x-1, pos.y+1),
+
+                        tex10 = sampler(pos.x, pos.y-1),
+                        tex11 = sampler(pos.x, pos.y),
+                        tex12 = sampler(pos.x, pos.y+1),
+
+                        tex20 = sampler(pos.x+1, pos.y-1),
+                        tex21 = sampler(pos.x+1, pos.y),
+                        tex22 = sampler(pos.x+1, pos.y+1);
+
+            // weigh along the y-direction
+            tex00 = tex00-2*tex01+tex02;
+            tex10 = tex10-2*tex11+tex12;
+            tex20 = tex20-2*tex21+tex22;
+
+            // weigh along the x-direction
+            return tex00-2*tex10+tex20;
         }
     }
 };
