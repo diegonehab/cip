@@ -565,6 +565,7 @@ void print_help(const char *progname)
             "  - replacement[old_r,old_g,old_b,new_r,new_g,new_b,tau_r,tau_g,tau_b]\n"
             "  - gradient_edge_detection[]\n"
             "  - laplacian[]\n"
+            "  - laplace_edge_enhancement[mult]\n"
             "\n"
             "without -o, shows a GUI\n";
 }
