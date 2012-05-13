@@ -348,17 +348,22 @@ void convolve(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,/*{{{*/
     cudaFreeArray(a_in);
 }/*}}}*/
 
+template void convolve(dimage_ptr<float,1> out, dimage_ptr<const float,1> in, 
+                       const array<float,8> &kernel, int);
+
+// lower sm doesn't have enough shared memory for RGB convolution
+#if USE_SM>=20
+
 template void convolve(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in, 
                        const array<float,8> &kernel, int);
 
 template void convolve(dimage_ptr<float3,1> out, dimage_ptr<const float3,1> in, 
                        const array<float,8> &kernel, int);
 
-template void convolve(dimage_ptr<float,1> out, dimage_ptr<const float,1> in, 
-                       const array<float,8> &kernel, int);
 
 template void convolve(dimage_ptr<float,3> out, dimage_ptr<const float,3> in, 
                        const array<float,8> &kernel, int);
+#endif
 
 // I/O ------------------------------------------------------------
 
