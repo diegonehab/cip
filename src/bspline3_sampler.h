@@ -48,51 +48,67 @@ public:
     __device__ inline 
     result_type operator()(float2 pos, int kx=0, int ky=0) const
     {
-        // transform the coordinate from [0,extent] to [-0.5, extent-0.5]
-    //    float2 pos = make_float2(x-0.5f,y-0.5f);
-        float2 index = floor(pos-0.5f);
-
-        float2 alpha = pos - index;
-
-        float2 w0, w1, w2, w3;
-
-        bspline3_weights(alpha.x, w0.x, w1.x, w2.x, w3.x, kx);
-        bspline3_weights(alpha.y, w0.y, w1.y, w2.y, w3.y, ky);
-
-        float2 g0 = w0 + w1,
-               g1 = w2 + w3,
-              // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
-               h0 = (w1 / g0) - 0.5f + index,
-               h1 = (w3 / g1) + 1.5f + index;
-
         S sampler;
 
-        // fetch the four linear
-        result_type tex00 = sampler(h0.x, h0.y),
-                    tex01 = sampler(h0.x, h1.y),
-                    tex10 = sampler(h1.x, h0.y),
-                    tex11 = sampler(h1.x, h1.y);
-
-        // weigh along the y-direction
-        if(ky == 0)
+        if(kx!=2 && ky != 2)
         {
-            tex00 = lerp(tex01, tex00, g0.y);
-            tex10 = lerp(tex11, tex10, g0.y);
+            float2 index = floor(pos-0.5f);
+
+            float2 alpha = pos - index;
+
+            float2 w0, w1, w2, w3;
+
+            bspline3_weights(alpha.x, w0.x, w1.x, w2.x, w3.x, kx);
+            bspline3_weights(alpha.y, w0.y, w1.y, w2.y, w3.y, ky);
+
+            float2 g0 = w0 + w1,
+                   g1 = w2 + w3,
+                  // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
+                   h0 = (w1 / g0) - 0.5f + index,
+                   h1 = (w3 / g1) + 1.5f + index;
+
+            // fetch the four linear
+            result_type tex00 = sampler(h0.x, h0.y),
+                        tex01 = sampler(h0.x, h1.y),
+                        tex10 = sampler(h1.x, h0.y),
+                        tex11 = sampler(h1.x, h1.y);
+
+            // weigh along the y-direction
+            if(ky == 0)
+            {
+                tex00 = lerp(tex01, tex00, g0.y);
+                tex10 = lerp(tex11, tex10, g0.y);
+            }
+            else
+            {
+                tex00 = (tex00 - tex01)*g0.y;
+                tex10 = (tex10 - tex11)*g0.y;
+            }
+
+
+            // weigh along the x-direction
+            if(kx == 0)
+                return lerp(tex10, tex00, g0.x);
+            else
+                return (tex10 - tex00)*g0.x;
         }
-        else
+        else if(kx == 2)
         {
-            tex00 = (tex00 - tex01)*g0.y;
-            tex10 = (tex10 - tex11)*g0.y;
+            result_type tex0 = sampler(pos.x-1, pos.y),
+                        tex1 = sampler(pos.x, pos.y),
+                        tex2 = sampler(pos.x+1, pos.y);
+
+            return tex0-2*tex1+tex2;
         }
+        else 
+        {
+            result_type tex0 = sampler(pos.x, pos.y-1),
+                        tex1 = sampler(pos.x, pos.y),
+                        tex2 = sampler(pos.x, pos.y+1);
 
-
-        // weigh along the x-direction
-        if(kx == 0)
-            return lerp(tex10, tex00, g0.x);
-        else
-            return (tex10 - tex00)*g0.x;
+            return tex0-2*tex1+tex2;
+        }
     }
-private:
 };
 
 #endif

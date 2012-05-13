@@ -109,19 +109,13 @@ __device__ inline T gradient_edge_detection(T dx, T dy)
     return saturate(sqrt(dx*dx+dy*dy));
 }
 
-// uniform_quantization ----------------------------------------------------
+// laplacian  ----------------------------------------------------
 
-#if 0
-__device__ inline float3 uniform_quatization(float v, int N)
+template <class T>
+__device__ inline T laplacian(T dxx, T dyy)
 {
-    float dist = 1000.0f;
-    float3 cur = make_float3(0,0,0);
-
-#pragma unroll
-    for(int i=0; i<N; ++i)
-    {
-        float3 a = fabs(
+    return saturate(dxx+dyy);
 }
-#endif
+
 
 #endif

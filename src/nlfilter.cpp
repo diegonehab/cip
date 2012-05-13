@@ -96,6 +96,7 @@ MainFrame::MainFrame()
     m_effects->add("Threshold",0,NULL,(void*)EFFECT_THRESHOLD);
     m_effects->add("Replacement",0,NULL,(void*)EFFECT_REPLACEMENT);
     m_effects->add("Gradient edge detection",0,NULL,(void*)EFFECT_GRADIENT_EDGE_DETECTION);
+    m_effects->add("Laplacian",0,NULL,(void*)EFFECT_LAPLACIAN);
     m_effects->value(0);
 
     // kicks off the render thread
@@ -382,8 +383,7 @@ void MainFrame::on_choose_effect(effect_type effect)
     // creates the panel associated with the selected effect
     switch(effect)
     {
-    case EFFECT_GRADIENT_EDGE_DETECTION:
-    case EFFECT_IDENTITY:
+    default:
         panel = NULL;
         break;
     case EFFECT_POSTERIZE:
@@ -486,6 +486,8 @@ filter_operation parse_filter_operation(const std::string &spec)
         op.type = EFFECT_IDENTITY;
     else if(opname == "gradient_edge_detection")
         op.type = EFFECT_GRADIENT_EDGE_DETECTION;
+    else if(opname == "laplacian")
+        op.type = EFFECT_LAPLACIAN;
     else if(opname == "posterize")
     {
         op.type = EFFECT_POSTERIZE;
@@ -546,6 +548,7 @@ void print_help(const char *progname)
             "  - threshold[value]\n"
             "  - replacement[old_r,old_g,old_b,new_r,new_g,new_b,tau_r,tau_g,tau_b]\n"
             "  - gradient_edge_detection[]\n"
+            "  - laplacian[]\n"
             "\n"
             "without -o, shows a GUI\n";
 }
