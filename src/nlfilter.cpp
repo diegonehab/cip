@@ -97,6 +97,7 @@ MainFrame::MainFrame()
     m_effects->add("Replacement",0,NULL,(void*)EFFECT_REPLACEMENT);
     m_effects->add("Gradient edge detection",0,NULL,(void*)EFFECT_GRADIENT_EDGE_DETECTION);
     m_effects->add("Laplacian",0,NULL,(void*)EFFECT_LAPLACIAN);
+    m_effects->add("Laplace edge enhancement",0,NULL,(void*)EFFECT_LAPLACE_EDGE_ENHANCEMENT);
     m_effects->value(0);
 
     // kicks off the render thread
@@ -421,6 +422,14 @@ void MainFrame::on_choose_effect(effect_type effect)
             panel = _panel;
         }
         break;
+    case EFFECT_LAPLACE_EDGE_ENHANCEMENT:
+        {
+            ParamLaplaceEdgeEnhancementUI *_panel 
+                = new ParamLaplaceEdgeEnhancementUI(0,0,pw,ph);
+            _panel->multiple->callback(on_param_changed, this);
+            panel = _panel;
+        }
+        break;
     case EFFECT_REPLACEMENT:
         {
             ParamReplacementUI *_panel = new ParamReplacementUI(0,0,pw,ph);
@@ -486,6 +495,11 @@ filter_operation parse_filter_operation(const std::string &spec)
         op.type = EFFECT_IDENTITY;
     else if(opname == "gradient_edge_detection")
         op.type = EFFECT_GRADIENT_EDGE_DETECTION;
+    else if(opname == "laplace_edge_enhancement")
+    {
+        op.type = EFFECT_LAPLACE_EDGE_ENHANCEMENT;
+        ss >> op.multiple;
+    }
     else if(opname == "laplacian")
         op.type = EFFECT_LAPLACIAN;
     else if(opname == "posterize")

@@ -22,7 +22,8 @@ enum effect_type
     EFFECT_THRESHOLD,
     EFFECT_REPLACEMENT,
     EFFECT_LAPLACIAN,
-    EFFECT_GRADIENT_EDGE_DETECTION
+    EFFECT_GRADIENT_EDGE_DETECTION,
+    EFFECT_LAPLACE_EDGE_ENHANCEMENT
 };
 
 struct filter_operation
@@ -51,6 +52,9 @@ struct filter_operation
         {
             float3 old_color, new_color, tau;
         };
+
+        // laplace edge enhancement
+        float multiple;
     };
 };
 

@@ -57,6 +57,10 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
         return gradient_edge_detection(sampler(pos,1,0),sampler(pos,0,1));
     case EFFECT_LAPLACIAN:
         return laplacian(sampler(pos,2,0),sampler(pos,0,2));
+    case EFFECT_LAPLACE_EDGE_ENHANCEMENT:
+        return laplace_edge_enhancement(sampler(pos),
+                                        sampler(pos,2,0),sampler(pos,0,2),
+                                        filter_op.multiple);
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);
@@ -258,6 +262,9 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
         break;
     case EFFECT_LAPLACIAN:
         filter_kernel1<EFFECT_LAPLACIAN,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_LAPLACE_EDGE_ENHANCEMENT:
+        filter_kernel1<EFFECT_LAPLACE_EDGE_ENHANCEMENT,C><<<gdim, bdim>>>(&temp);
         break;
     }
                    

@@ -139,7 +139,17 @@ widget_class ParamReplacementUI {open
     xywh {124 66 110 25} type {Horz Knob} align 1 value 0.5
   }
   Fl_Value_Slider tau_blue {
-    label {τ_blue} selected
+    label {τ_blue}
     xywh {240 66 110 25} type {Horz Knob} align 1 value 0.5
+  }
+} 
+
+widget_class ParamLaplaceEdgeEnhancementUI {open selected
+  xywh {1136 838 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Value_Slider multiple {
+    label {Multiple:}
+    xywh {85 10 265 25} type {Horz Knob} align 4 value 0.5
   }
 } 

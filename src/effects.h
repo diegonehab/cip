@@ -117,5 +117,13 @@ __device__ inline T laplacian(T dxx, T dyy)
     return saturate(dxx+dyy);
 }
 
+// laplace_edge_enhacement -----------------------------------------
+
+
+template <class T>
+__device__ inline T laplace_edge_enhancement(T v, T dxx, T dyy, float multiple)
+{
+    return saturate(v - multiple*(dxx-dyy));
+}
 
 #endif
