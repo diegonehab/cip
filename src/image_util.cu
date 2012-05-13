@@ -13,11 +13,13 @@ const int BW = 32, // cuda block width
           BH = 16, // cuda block height
           NB = 3;
 
+template <class T, int C, class U, int D>/*{{{*/
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert_kernel(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in)
+void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
+    typename enable_if<pixel_traits<T>::is_integral == pixel_traits<U>::is_integral>::type*)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -31,33 +33,15 @@ void convert_kernel(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in)
     out += idx;
 
     *out = *in;
-}
+}/*}}}*/
 
+template <class T, int C, class U, int D>/*{{{*/
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert_kernel(dimage_ptr<uchar3,1> out, dimage_ptr<const float,3> in)
-{
-    int tx = threadIdx.x, ty = threadIdx.y;
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(!in.is_inside(x,y))
-        return;
-
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
-
-    float3 v = saturate(*in)*255.0f;
-    *out = make_uchar3(v.x,v.y,v.z);
-}
-
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void convert_kernel(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in)
+void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
+    typename enable_if<pixel_traits<T>::is_integral && !pixel_traits<U>::is_integral>::type*)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -70,14 +54,16 @@ void convert_kernel(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in)
     in += idx;
     out += idx;
 
-    *out = *in;
-}
+    *out = pixel_traits<T,C>::make_pixel(saturate(*in)*255.0f);
+}/*}}}*/
 
+template <class T, int C, class U, int D>/*{{{*/
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert_kernel(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in)
+void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
+    typename enable_if<!pixel_traits<T>::is_integral && pixel_traits<U>::is_integral>::type*)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -86,16 +72,12 @@ void convert_kernel(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in)
     if(!in.is_inside(x,y))
         return;
 
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
+    *out = pixel_traits<T,C>::make_pixel(*in)/255.0;
+}/*}}}*/
 
-    uchar3 v = *in;
-    *out = make_float3(v.x/255.0,v.y/255.0,v.z/255.0);
-}
 
-template <class T, int CT, class U, int CU>
-void call_convert(dimage_ptr<T,CT> out, dimage_ptr<const U,CU> in)
+template <class T, int C, class U, int D>
+void convert(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
 {
     if(out.width() != in.width() || out.height() != in.height())
         throw std::runtime_error("Image dimensions don't match");
@@ -103,26 +85,14 @@ void call_convert(dimage_ptr<T,CT> out, dimage_ptr<const U,CU> in)
     dim3 bdim(BW,BH),
          gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
 
-    convert_kernel<<<gdim, bdim>>>(out, in);
+    convert_kernel<<<gdim, bdim>>>(out, in, (void *)NULL);
 }
 
-void convert(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in)
-{
-    call_convert(out, in);
-}
-void convert(dimage_ptr<uchar3,1> out, dimage_ptr<const float,3> in)
-{
-    call_convert(out, in);
-}
+template void convert(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in);
+template void convert(dimage_ptr<uchar3,1> out, dimage_ptr<const float,3> in);
 
-void convert(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in)
-{
-    call_convert(out, in);
-}
-void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in)
-{
-    call_convert(out, in);
-}
+template void convert(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in);
+template void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in);
 
 // grayscale ------------------------------------------------------------
 

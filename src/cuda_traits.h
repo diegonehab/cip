@@ -26,11 +26,17 @@ HOSTDEV inline float2 make_float2(const float2 &v) { return v; }
 HOSTDEV inline float3 make_float3(const float3 &v) { return v; }
 HOSTDEV inline float4 make_float4(const float4 &v) { return v; }
 
+HOSTDEV inline float3 make_float3(const uchar3 &v)
+    { return make_float3(v.x,v.y,v.z); }
+
 HOSTDEV inline uchar2 make_uchar2(const uchar2 &v) { return v; }
 HOSTDEV inline uchar3 make_uchar3(const uchar3 &v) { return v; }
 HOSTDEV inline uchar4 make_uchar4(const uchar4 &v) { return v; }
 
-// cuda types (float2, float3, ...) traits/*{{{*/
+HOSTDEV inline uchar3 make_uchar3(const float3 &v) 
+    { return make_uchar3(v.x,v.y,v.z); }
+
+
 template <class T>
 struct cuda_traits
 {
@@ -43,21 +49,7 @@ struct cuda_traits
     {
         return x;
     }
-
-    template <class U>
-    HOSTDEV static 
-    typename enable_if<cuda_traits<U>::is_composite,T>::type
-        make_pixel(U v)
-    {
-        return v.x;
-    }
 };
-
-template <class T>
-struct cuda_traits<const T> : cuda_traits<T> {};
-
-template <class T>
-struct cuda_traits<const volatile T> : cuda_traits<T> {};
 
 template <>
 struct cuda_traits<uchar1>
@@ -68,10 +60,7 @@ struct cuda_traits<uchar1>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static uchar1 make(U x)
-    {
-        return make_uchar1(x);
-    }
+    HOSTDEV static uchar1 make(U x) { return make_uchar1(x); }
 };
 
 template <>
@@ -83,15 +72,10 @@ struct cuda_traits<uchar2>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static uchar2 make(U x)
-    {
-        return make_uchar2(x);
-    }
+    HOSTDEV static uchar2 make(U x) { return make_uchar2(x); }
+
     template <class U, class V>
-    HOSTDEV static uchar2 make(U x, V y)
-    {
-        return make_uchar2(x,y);
-    }
+    HOSTDEV static uchar2 make(U x,V y) { return make_uchar2(x,y); }
 };
 
 template <>
@@ -103,21 +87,13 @@ struct cuda_traits<uchar3>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static uchar3 make(U x)
-    {
-        return make_uchar3(x);
-    }
-    template <class U, class V>
-    HOSTDEV static uchar3 make(U x, V y)
-    {
-        return make_uchar3(x,y);
-    }
-    template <class U, class V, class W>
-    HOSTDEV static uchar3 make(U x, V y, W z)
-    {
-        return make_uchar3(x,y,z);
-    }
+    HOSTDEV static uchar3 make(U x) { return make_uchar3(x); }
 
+    template <class U, class V>
+    HOSTDEV static uchar3 make(U x,V y) { return make_uchar3(x,y); }
+
+    template <class U, class V, class W>
+    HOSTDEV static uchar3 make(U x,V y,W z) { return make_uchar3(x,y,z); }
 };
 
 template <>
@@ -129,25 +105,16 @@ struct cuda_traits<uchar4>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static uchar4 make(U x)
-    {
-        return make_uchar4(x);
-    }
+    HOSTDEV static uchar4 make(U x) { return make_uchar4(x); }
+
     template <class U, class V>
-    HOSTDEV static uchar4 make(U x, V y)
-    {
-        return make_uchar4(x,y);
-    }
+    HOSTDEV static uchar4 make(U x,V y) { return make_uchar4(x,y); }
+
     template <class U, class V, class W>
-    HOSTDEV static uchar4 make(U x, V y, W z)
-    {
-        return make_uchar4(x,y,z);
-    }
+    HOSTDEV static uchar4 make(U x,V y,W z) { return make_uchar4(x,y,z); }
+
     template <class U, class V, class W, class X>
-    HOSTDEV static uchar4 make(U x, V y, W z, X w)
-    {
-        return make_uchar4(x,y,z,w);
-    }
+    HOSTDEV static uchar4 make(U x,V y,W z,X w) { return make_uchar4(x,y,z,w); }
 };
 
 template <>
@@ -159,10 +126,7 @@ struct cuda_traits<float1>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static float1 make(U x)
-    {
-        return make_float1(x);
-    }
+    HOSTDEV static float1 make(U x) { return make_float1(x); }
 };
 
 template <>
@@ -174,25 +138,10 @@ struct cuda_traits<float2>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static float2 make(U x)
-    {
-        return make_float2(x);
-    }
+    HOSTDEV static float2 make(U x) { return make_float2(x); }
+
     template <class U, class V>
-    HOSTDEV static float2 make(U x, V y)
-    {
-        return make_float2(x,y);
-    }
-    template <class U, class V, class W>
-    HOSTDEV static float2 make(U x, V y, W z)
-    {
-        return make_float2(x,y,z);
-    }
-    template <class U, class V, class W, class X>
-    HOSTDEV static float2 make(U x, V y, W z, X w)
-    {
-        return make_float2(x,y,z,w);
-    }
+    HOSTDEV static float2 make(U x,V y) { return make_float2(x,y); }
 };
 
 template <>
@@ -204,20 +153,13 @@ struct cuda_traits<float3>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static float3 make(U x)
-    {
-        return make_float3(x);
-    }
+    HOSTDEV static float3 make(U x) { return make_float3(x); }
+
     template <class U, class V>
-    HOSTDEV static float3 make(U x, V y)
-    {
-        return make_float3(x,y);
-    }
+    HOSTDEV static float3 make(U x,V y) { return make_float3(x,y); }
+
     template <class U, class V, class W>
-    HOSTDEV static float3 make(U x, V y, W z)
-    {
-        return make_float3(x,y,z);
-    }
+    HOSTDEV static float3 make(U x,V y,W z) { return make_float3(x,y,z); }
 };
 
 template <>
@@ -229,26 +171,26 @@ struct cuda_traits<float4>
     static const bool is_composite = true;
 
     template <class U>
-    HOSTDEV static float4 make(U x)
-    {
-        return make_float4(x);
-    }
+    HOSTDEV static float4 make(U x) { return make_float4(x); }
+
     template <class U, class V>
-    HOSTDEV static float4 make(U x, V y)
-    {
-        return make_float4(x,y);
-    }
+    HOSTDEV static float4 make(U x,V y) { return make_float4(x,y); }
+
     template <class U, class V, class W>
-    HOSTDEV static float4 make(U x, V y, W z)
-    {
-        return make_float4(x,y,z);
-    }
+    HOSTDEV static float4 make(U x,V y,W z) { return make_float4(x,y,z); }
+
     template <class U, class V, class W, class X>
-    HOSTDEV static float4 make(U x, V y, W z, X w)
-    {
-        return make_float4(x,y,z,w);
-    }
+    HOSTDEV static float4 make(U x,V y,W z,X w) { return make_float4(x,y,z,w); }
 };
+
+
+template <class T>
+struct cuda_traits<const T> : cuda_traits<T> {};
+
+template <class T>
+struct cuda_traits<const volatile T> : cuda_traits<T> {};
+
+
 /*}}}*/
 
 template <class T, int C>

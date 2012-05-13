@@ -6,10 +6,14 @@
 #include "dimage.h"
 #include "util.h"
 
-void convert(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in);
-void convert(dimage_ptr<uchar3,1> out, dimage_ptr<const float,3> in);
-void convert(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in);
-void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in);
+template <class T, int C, class U, int D>
+void convert(dimage_ptr<T,C> out, dimage_ptr<const U,D> in);
+
+template <class T, int C, class U, int D>
+void convert(dimage_ptr<T,C> out, dimage_ptr<U,D> in)
+{
+    convert(out, static_cast<dimage_ptr<const U,D> >(in));
+}
 
 template <class T, int C>
 void convert(dimage_ptr<T,C> out, dimage_ptr<const T,C> in)
