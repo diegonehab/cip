@@ -72,6 +72,10 @@ void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
     if(!in.is_inside(x,y))
         return;
 
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
+
     *out = pixel_traits<T,C>::make_pixel(*in)/255.0;
 }/*}}}*/
 
