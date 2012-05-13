@@ -32,6 +32,8 @@ HOSTDEV inline float3 make_float3(const uchar3 &v)
 HOSTDEV inline uchar2 make_uchar2(const uchar2 &v) { return v; }
 HOSTDEV inline uchar3 make_uchar3(const uchar3 &v) { return v; }
 HOSTDEV inline uchar4 make_uchar4(const uchar4 &v) { return v; }
+HOSTDEV inline uchar3 make_uchar3(float v) 
+    { return make_uchar3(v,v,v); }
 
 HOSTDEV inline uchar3 make_uchar3(const float3 &v) 
     { return make_uchar3(v.x,v.y,v.z); }

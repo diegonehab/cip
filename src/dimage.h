@@ -184,19 +184,24 @@ private:
 
         typedef typename pixel_traits<T,C>::pixel_type value_type;
 
+        template <class V>
         HOSTDEV
-        pixel_proxy &operator=(const pixel_proxy &p)
+        pixel_proxy &operator=(const V &p)
         {
-            pixel_traits<texel_type,D>::assign(m_img.m_data, m_img.channelstride(), p);
+            pixel_traits<texel_type,D>::assign(m_img.m_data, 
+                                               m_img.channelstride(), 
+                                           pixel_traits<T,C>::make_pixel(p));
             return *this;
         }
 
+#if 0
         HOSTDEV
         pixel_proxy &operator=(const value_type &v)
         {
             pixel_traits<texel_type,D>::assign(m_img.m_data, m_img.channelstride(), v);
             return *this;
         }
+#endif
 
         HOSTDEV
         pixel_proxy &operator+=(const value_type &v)

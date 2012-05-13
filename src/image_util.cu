@@ -88,11 +88,15 @@ void convert(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
     convert_kernel<<<gdim, bdim>>>(out, in, (void *)NULL);
 }
 
-template void convert(dimage_ptr<float3,1> out, dimage_ptr<const float,3> in);
-template void convert(dimage_ptr<uchar3,1> out, dimage_ptr<const float,3> in);
+template void convert(dimage_ptr<float3> out, dimage_ptr<const float,3> in);
+template void convert(dimage_ptr<uchar3> out, dimage_ptr<const float,3> in);
 
-template void convert(dimage_ptr<float,3> out, dimage_ptr<const float3,1> in);
-template void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3,1> in);
+template void convert(dimage_ptr<float,3> out, dimage_ptr<const float3> in);
+template void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3> in);
+
+template void convert(dimage_ptr<float3> out, dimage_ptr<const float> in);
+template void convert(dimage_ptr<float,3> out, dimage_ptr<const float> in);
+template void convert(dimage_ptr<uchar3> out, dimage_ptr<const float> in);
 
 // grayscale ------------------------------------------------------------
 
