@@ -61,6 +61,12 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
         return laplace_edge_enhancement(sampler(pos),
                                         sampler(pos,2,0),sampler(pos,0,2),
                                         filter_op.multiple);
+    case EFFECT_YAROSLAVSKY_BILATERAL:
+        return yaroslavsky_bilateral(sampler(pos),
+                                     sampler(pos,1,0), sampler(pos,0,1),
+                                     sampler(pos,1,1),
+                                     sampler(pos,2,0),sampler(pos,0,2),
+                                     filter_op.rho, filter_op.h);
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);
@@ -266,6 +272,9 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
     case EFFECT_LAPLACE_EDGE_ENHANCEMENT:
         filter_kernel1<EFFECT_LAPLACE_EDGE_ENHANCEMENT,C><<<gdim, bdim>>>(&temp);
         break;
+    case EFFECT_YAROSLAVSKY_BILATERAL:
+        filter_kernel1<EFFECT_YAROSLAVSKY_BILATERAL,C><<<gdim, bdim>>>(&temp);
+        break;
     }
                    
     {
@@ -380,7 +389,6 @@ void filter(dimage_ptr<float,3> img, const filter_operation &op);
 
 #endif
 /*}}}*/
-
 
 float bspline3(float r)
 {

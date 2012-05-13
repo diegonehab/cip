@@ -140,4 +140,63 @@ T laplace_edge_enhancement(T v, T dxx, T dyy, float multiple)
     return saturate(v - multiple*(dxx-dyy));
 }
 
+// yaroslavsky bilateral --------------------------------------------
+namespace detail
+{
+
+__device__ inline
+float calc_yb_g_tilde(float param, float E)
+{
+    if(param < 0.000001f)
+        return 1.f/6;
+    else
+        return (param*exp(-(param*param)))/(3.f*E);
+}
+
+
+__device__ inline
+float3 calc_yb_g_tilde(float3 param, float3 E)
+{
+    return make_float3(calc_yb_g_tilde(param.x,E.x),
+                       calc_yb_g_tilde(param.y,E.y),
+                       calc_yb_g_tilde(param.z,E.z));
+}
+
+__device__ inline
+float calc_yb_f_tilde(float param, float g_tilde)
+{
+    if(param < 0.000001f)
+        return 1.f/6;
+    else
+        return 3.f*g_tilde+((3.f*g_tilde-0.5f)/(param*param));
+}
+
+__device__ inline
+float3 calc_yb_f_tilde(float3 param, float3 g_tilde)
+{
+    return make_float3(calc_yb_f_tilde(param.x,g_tilde.x),
+                       calc_yb_f_tilde(param.y,g_tilde.y),
+                       calc_yb_f_tilde(param.z,g_tilde.z));
+}
+}
+
+template <class T>
+__device__ inline
+T yaroslavsky_bilateral(T v, T dx, T dy, T dxy, T dxx, T dyy,
+                        float rho, float h)
+{
+    T grad = sqrt(dx*dx + dy*dy),
+      ort = (1.f/(grad*grad))*(dx*dx*dxx + 2*dx*dy*dxy + dy*dy*dyy),
+      tan = (1.f/(grad*grad))*(dy*dy*dxx - 2*dx*dy*dxy + dx*dx*dyy),
+      param = grad*rho / h;
+
+    const float sqrt_pi = 1.77245385;
+    T E = 2*((sqrt_pi/2.f)*erff(param));
+
+    T g_tilde = detail::calc_yb_g_tilde(param, E),
+      f_tilde = detail::calc_yb_f_tilde(param, g_tilde);
+
+    return saturate(v + rho*rho*(f_tilde*ort + g_tilde*tan));
+}
+
 #endif

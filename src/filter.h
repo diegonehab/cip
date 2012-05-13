@@ -23,7 +23,8 @@ enum effect_type
     EFFECT_REPLACEMENT,
     EFFECT_LAPLACIAN,
     EFFECT_GRADIENT_EDGE_DETECTION,
-    EFFECT_LAPLACE_EDGE_ENHANCEMENT
+    EFFECT_LAPLACE_EDGE_ENHANCEMENT,
+    EFFECT_YAROSLAVSKY_BILATERAL
 };
 
 struct filter_operation
@@ -55,6 +56,12 @@ struct filter_operation
 
         // laplace edge enhancement
         float multiple;
+
+        // yaroslavsky bilateral
+        struct
+        {
+            float rho, h;
+        };
     };
 };
 

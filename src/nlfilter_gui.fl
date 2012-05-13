@@ -144,12 +144,26 @@ widget_class ParamReplacementUI {open
   }
 } 
 
-widget_class ParamLaplaceEdgeEnhancementUI {open selected
+widget_class ParamLaplaceEdgeEnhancementUI {open
   xywh {1136 838 355 100} type Double
   class Fl_Group visible
 } {
   Fl_Value_Slider multiple {
     label {Multiple:}
     xywh {85 10 265 25} type {Horz Knob} align 4 value 0.5
+  }
+} 
+
+widget_class ParamYaroslavskiBilateralUI {open selected
+  xywh {726 779 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Value_Slider rho {
+    label {rho:}
+    xywh {40 10 310 25} type {Horz Knob} align 4 value 0.5
+  }
+  Fl_Value_Slider h {
+    label {h:}
+    xywh {40 45 310 25} type {Horz Knob} align 4 value 0.5
   }
 } 

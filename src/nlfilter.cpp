@@ -98,6 +98,7 @@ MainFrame::MainFrame()
     m_effects->add("Gradient edge detection",0,NULL,(void*)EFFECT_GRADIENT_EDGE_DETECTION);
     m_effects->add("Laplacian",0,NULL,(void*)EFFECT_LAPLACIAN);
     m_effects->add("Laplace edge enhancement",0,NULL,(void*)EFFECT_LAPLACE_EDGE_ENHANCEMENT);
+    m_effects->add("Yaroslavski bilateral",0,NULL,(void*)EFFECT_YAROSLAVSKY_BILATERAL);
     m_effects->value(0);
 
     // kicks off the render thread
@@ -237,6 +238,11 @@ void *MainFrame::render_thread(MainFrame *frame)
                 op.threshold = panel->threshold->value();
             else if(const ParamLaplaceEdgeEnhancementUI *panel = dynamic_cast<const ParamLaplaceEdgeEnhancementUI *>(frame->m_param_panel))
                 op.multiple = panel->multiple->value();
+            else if(const ParamYaroslavskiBilateralUI *panel = dynamic_cast<const ParamYaroslavskiBilateralUI *>(frame->m_param_panel))
+            {
+                op.rho = panel->rho->value();
+                op.h = panel->h->value();
+            }
             else if(const ParamReplacementUI *panel = dynamic_cast<const ParamReplacementUI *>(frame->m_param_panel))
             {
                 unsigned char r,g,b;
@@ -444,6 +450,15 @@ void MainFrame::on_choose_effect(effect_type effect)
             panel = _panel;
         }
         break;
+    case EFFECT_YAROSLAVSKY_BILATERAL:
+        {
+            ParamYaroslavskiBilateralUI *_panel 
+                = new ParamYaroslavskiBilateralUI(0,0,pw,ph);
+            _panel->rho->callback(on_param_changed, this);
+            _panel->h->callback(on_param_changed, this);
+            panel = _panel;
+        }
+        break;
     }
 
     if(m_param_panel)
@@ -529,6 +544,14 @@ filter_operation parse_filter_operation(const std::string &spec)
         op.type = EFFECT_THRESHOLD;
         ss >> op.threshold;
     }
+    else if(opname == "yaroslavsky_bilateral")
+    {
+        op.type = EFFECT_YAROSLAVSKY_BILATERAL;
+        char c;
+        ss >> op.rho >> c >> op.h;
+        if(c != ',')
+            ss.setstate(std::ios::failbit);
+    }
     else if(opname == "replacement")
     {
         op.type = EFFECT_REPLACEMENT;
@@ -566,6 +589,7 @@ void print_help(const char *progname)
             "  - gradient_edge_detection[]\n"
             "  - laplacian[]\n"
             "  - laplace_edge_enhancement[mult]\n"
+            "  - yaroslavsky_bilateral[rho,h]\n"
             "\n"
             "without -o, shows a GUI\n";
 }
