@@ -557,9 +557,10 @@ int main(int argc, char *argv[])
         std::string infile,
                     outfile,
                     effect = "identity[]";
+        bool do_grayscale = false;
 
         int opt;
-        while((opt = getopt(argc, argv, "-ho:e:")) != -1)
+        while((opt = getopt(argc, argv, "-hgo:e:")) != -1)
         {
             switch(opt)
             {
@@ -571,6 +572,9 @@ int main(int argc, char *argv[])
                 break;
             case 'e':
                 effect = optarg;
+                break;
+            case 'g':
+                do_grayscale = true;
                 break;
             case 1:
                 if(!infile.empty())
@@ -598,17 +602,29 @@ int main(int argc, char *argv[])
             dimage<uchar3,1> d_img;
             d_img.copy_from_host(imgdata, width, height);
 
-            dimage<float,3> d_channels;
+            setup_recursive_filter(width, height, d_img.rowstride());
 
-            d_channels.resize(d_img.width(), d_img.height());
+            if(do_grayscale)
+            {
+                dimage<float,1> d_gray;
+                d_gray.resize(d_img.width(), d_img.height());
+                grayscale(d_gray, &d_img);
 
-            convert(&d_channels, &d_img);
+                call_filter(&d_gray, &d_gray, op, VERBOSE);
 
-            setup_recursive_filter(width, height, d_channels.rowstride());
+                convert(&d_img, &d_gray);
+            }
+            else
+            {
+                dimage<float,3> d_channels;
+                d_channels.resize(d_img.width(), d_img.height());
 
-            call_filter(&d_channels, &d_channels, op, VERBOSE);
+                convert(&d_channels, &d_img);
 
-            convert(&d_img, &d_channels);
+                call_filter(&d_channels, &d_channels, op, VERBOSE);
+
+                convert(&d_img, &d_channels);
+            }
 
             d_img.copy_to_host(imgdata);
 
