@@ -6,26 +6,30 @@
 // posterize ------------------------------------------------------------
 
 template <class T>
-__device__ inline T posterize(T v, int levels)
+__device__ inline 
+T posterize(T v, int levels)
 {
     return saturate(rint(v*(levels-1))/(levels-1));
 }
 
 // threshold ------------------------------------------------------------
 
-__device__ inline float threshold(float v, float a)
+__device__ inline 
+float threshold(float v, float a)
 {
     return v < a ? 0 : 1;
 }
 
-__device__ inline float3 threshold(float3 v, float a)
+__device__ inline 
+float3 threshold(float3 v, float a)
 {
     return make_float3(threshold(v.x, a), threshold(v.y, a), threshold(v.z, a));
 }
 
 // grayscale  ------------------------------------------------------------
 
-__device__ inline float grayscale(float3 in)
+__device__ inline 
+float grayscale(float3 in)
 {
     return 0.2126f * in.x + 0.7152f*in.y + 0.0722f*in.z;
 }
@@ -33,7 +37,8 @@ __device__ inline float grayscale(float3 in)
 // scale -------------------------------------------------------------
 
 template <class T>
-__device__ inline T scale(T v, float a)
+__device__ inline 
+T scale(T v, float a)
 {
     return v*a;
 }
@@ -41,14 +46,16 @@ __device__ inline T scale(T v, float a)
 // bias -------------------------------------------------------------
 
 template <class T>
-__device__ inline T bias(T v, float a)
+__device__ inline 
+T bias(T v, float a)
 {
     return v+a;
 }
 
 // replacement -------------------------------------------------------------
 
-__device__ inline float replacement(float v, float3 old, float3 new_, float3 tau)
+__device__ inline 
+float replacement(float v, float3 old, float3 new_, float3 tau)
 {
     float a = fabs(v-grayscale(old));
 
@@ -58,7 +65,8 @@ __device__ inline float replacement(float v, float3 old, float3 new_, float3 tau
         return v;
 }
 
-__device__ inline float3 replacement(float3 v, float3 old, float3 new_, float3 tau)
+__device__ inline 
+float3 replacement(float3 v, float3 old, float3 new_, float3 tau)
 {
     float3 a = fabs(v-old);
 
@@ -70,7 +78,8 @@ __device__ inline float3 replacement(float3 v, float3 old, float3 new_, float3 t
 
 // polynomial ---------------------------------------------------------------
 
-__device__ inline float3 polynomial(float3 v, int N, float *coeff)
+__device__ inline 
+float3 polynomial(float3 v, int N, float *coeff)
 {
     float3 cur = make_float3(0,0,0),
            power = make_float3(1,1,1);
@@ -85,7 +94,8 @@ __device__ inline float3 polynomial(float3 v, int N, float *coeff)
 
 // root --------------------------------------------------------------------
 
-__device__ inline float root(float v, float n)
+__device__ inline 
+float root(float v, float n)
 {
     if(v < 0 || v < 0 || v < 0)
         v = 0;
@@ -93,7 +103,8 @@ __device__ inline float root(float v, float n)
     return saturate(pow(v,1/n));
 }
 
-__device__ inline float3 root(float3 v, float n)
+__device__ inline 
+float3 root(float3 v, float n)
 {
     if(v.x < 0 || v.y < 0 || v.z < 0)
         v = make_float3(0,0,0);
@@ -104,7 +115,8 @@ __device__ inline float3 root(float3 v, float n)
 // gradient_edge_detection ------------------------------------------------
 
 template <class T>
-__device__ inline T gradient_edge_detection(T dx, T dy)
+__device__ inline 
+T gradient_edge_detection(T dx, T dy)
 {
     return saturate(sqrt(dx*dx+dy*dy));
 }
@@ -112,7 +124,8 @@ __device__ inline T gradient_edge_detection(T dx, T dy)
 // laplacian  ----------------------------------------------------
 
 template <class T>
-__device__ inline T laplacian(T dxx, T dyy)
+__device__ inline 
+T laplacian(T dxx, T dyy)
 {
     return saturate(dxx+dyy);
 }
@@ -121,7 +134,8 @@ __device__ inline T laplacian(T dxx, T dyy)
 
 
 template <class T>
-__device__ inline T laplace_edge_enhancement(T v, T dxx, T dyy, float multiple)
+__device__ inline 
+T laplace_edge_enhancement(T v, T dxx, T dyy, float multiple)
 {
     return saturate(v - multiple*(dxx-dyy));
 }
