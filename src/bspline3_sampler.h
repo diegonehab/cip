@@ -3,6 +3,8 @@
 
 #include "math_util.h"
 
+#define USE_FAST_CUBIC_INTERPOLATION 1
+
 template <class T>
 __device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
                                  int k=0)
@@ -16,7 +18,7 @@ __device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
     case 0:
         w0 = (1/6.f) * one_alpha2*one_alpha,
         w1 = (2/3.f) - 0.5f*alpha2*(2.0f-alpha),
-        w2 = (1/6.f) -0.5f*one_alpha2*(2.0f-one_alpha),
+        w2 = (2/3.f) - 0.5f*one_alpha2*(2.0f-one_alpha),
         w3 = (1/6.f) * alpha*alpha2;
         break;
     case 1:
@@ -34,9 +36,6 @@ __device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
     }
 }
 
-
-
-
 template <class S>
 class bspline3_sampler
 {
@@ -49,56 +48,32 @@ public:
     {
         S sampler;
 
-        float2 index = floor(pos-0.5f);
-        float2 alpha = pos - index;
+        pos -= 0.5f;
 
-        float2 w0, w1, w2, w3;
-
-        bspline3_weights(alpha.x, w0.x, w1.x, w2.x, w3.x, kx);
-        bspline3_weights(alpha.y, w0.y, w1.y, w2.y, w3.y, ky);
-
-        float2 g0 = w0 + w1,
-               g1 = w2 + w3,
-              // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
-               h0 = (w1 / g0) - 0.5f + index,
-               h1 = (w3 / g1) + 1.5f + index;
-
-        // fetch the four linear
-        result_type tex00 = sampler(h0.x, h0.y),
-                    tex10 = sampler(h1.x, h0.y),
-                    tex01 = sampler(h0.x, h1.y),
-                    tex11 = sampler(h1.x, h1.y);
-
-        // weigh along the y-direction
-        tex00 = g0.y*tex00 + g1.y*tex01;
-        tex10 = g0.y*tex10 + g1.y*tex11;
-
-        // weigh along the x-direction
-        return g0.x*tex00 + g1.x*tex10;
-#if 0
-        if(kx<2 && ky<2)
+#if USE_FAST_CUBIC_INTERPOLATION
+        if(kx < 2 && ky < 2)
         {
-            float2 index = floor(pos-0.5f);
+            float2 index = floor(pos);
             float2 alpha = pos - index;
 
-            float2 w0, w1, w2, w3;
+            float2 w[4];
 
-            bspline3_weights(alpha.x, w0.x, w1.x, w2.x, w3.x, kx);
-            bspline3_weights(alpha.y, w0.y, w1.y, w2.y, w3.y, ky);
+            bspline3_weights(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
+            bspline3_weights(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
 
-            float2 g0 = w0 + w1,
-                   g1 = w2 + w3,
+
+            float2 g0 = w[0] + w[1],
+                   g1 = w[2] + w[3],
                   // h0 = w1/g0 - 1, move from [-0.5, extent-0.5] to [0, extent]
-                   h0 = (w1 / g0) - 0.5f + index,
-                   h1 = (w3 / g1) + 1.5f + index;
+                   h0 = (w[1] / g0) - 0.5f + index,
+                   h1 = (w[3] / g1) + 1.5f + index;
 
             // fetch the four linear
             result_type tex00 = sampler(h0.x, h0.y),
-                        tex01 = sampler(h0.x, h1.y),
                         tex10 = sampler(h1.x, h0.y),
+                        tex01 = sampler(h0.x, h1.y),
                         tex11 = sampler(h1.x, h1.y);
 
-            // weigh along the y-direction
             if(ky == 0)
             {
                 tex00 = lerp(tex01, tex00, g0.y);
@@ -110,16 +85,15 @@ public:
                 tex10 = (tex10 - tex11)*g0.y;
             }
 
-
-            // weigh along the x-direction
             if(kx == 0)
                 return lerp(tex10, tex00, g0.x);
             else
-                return (tex10 - tex00)*g0.x;
+                return (tex00 - tex10)*g0.x;
         }
         else if(kx == 2 && ky < 2)
         {
-            float index = floor(pos.y-0.5f);
+            pos.x += 0.5f;
+            float index = floor(pos.y);
             float alpha = pos.y - index;
 
             float w0, w1, w2, w3;
@@ -160,7 +134,8 @@ public:
         }
         else if(ky == 2 && kx < 2)
         {
-            float index = floor(pos.x-0.5f);
+            pos.y += 0.5f;
+            float index = floor(pos.x);
             float alpha = pos.x - index;
 
             float w0, w1, w2, w3;
@@ -214,6 +189,26 @@ public:
             // weigh along the x-direction
             return tex00-2*tex10+tex20;
         }
+#else
+        float2 index = floor(pos);
+        float2 alpha = pos - index;
+
+        float2 w[4];
+
+        bspline3_weights(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
+        bspline3_weights(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
+
+        result_type tex = cuda_traits<result_type>::make(0);
+
+#pragma unroll
+        for(int i=0; i<4; ++i)
+        {
+#pragma unroll
+            for(int j=0; j<4; ++j)
+                tex += sampler(index.x+0.5f+j-1,index.y+0.5f+i-1)*w[i].y*w[j].x;
+        }
+
+        return tex;
 #endif
     }
 };
