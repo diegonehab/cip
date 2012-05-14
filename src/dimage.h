@@ -317,13 +317,18 @@ public:
 
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(&m_data+channelstride(), width()*sizeof(texel_type), 
+            cudaMemcpy2D(&m_data[i*channelstride()], width()*sizeof(texel_type), 
                          &img+i*img.channelstride(), 
                          rowstride()*sizeof(texel_type), 
                          width()*sizeof(texel_type), height(), 
                          cudaMemcpyDeviceToDevice);
         }
         return *this;
+    }
+
+    dimage_ptr &operator=(const dimage_ptr &img)
+    {
+        return operator=(static_cast<dimage_ptr<const T,C> >(img));
     }
 
     dimage_ptr &operator=(const dimage<T,C> &img)
