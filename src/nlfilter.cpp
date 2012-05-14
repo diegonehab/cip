@@ -99,7 +99,7 @@ MainFrame::MainFrame()
     m_effects->add("Laplacian",0,NULL,(void*)EFFECT_LAPLACIAN);
     m_effects->add("Laplace edge enhancement",0,NULL,(void*)EFFECT_LAPLACE_EDGE_ENHANCEMENT);
     m_effects->add("Yaroslavski bilateral",0,NULL,(void*)EFFECT_YAROSLAVSKY_BILATERAL);
-    m_effects->add("Brightness/contrast",0,NULL,(void*)EFFECT_BRIGHTNESS_CONTRAST);
+    m_effects->add("Brightness and contrast",0,NULL,(void*)EFFECT_BRIGHTNESS_CONTRAST);
     m_effects->value(0);
 
     // kicks off the render thread
