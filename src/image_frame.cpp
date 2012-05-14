@@ -85,7 +85,13 @@ struct ImageFrame::impl
 
     void update_texture()/*{{{*/
     {
-        cudaArray *imgarray;
+        assert(must_update_texture);
+
+        // let's do this early so that, in case of exceptions, this
+        // function won't be called needlessly
+        must_update_texture = false;
+
+        cudaArray *imgarray = NULL;
 
         cudaGraphicsMapResources(1, &cuda_output_resource, 0);
         check_cuda_error("Error mapping output resource");
@@ -96,29 +102,35 @@ struct ImageFrame::impl
                 cuda_output_resource, 0, 0);
             check_cuda_error("Error getting output cudaArray");
 
+            assert(imgarray != NULL);
+
             if(grayscale)
             {
-                for(int i=1; i<3; ++i)
-                    img_buffer[i] = img_buffer[0];
+                cudaMemcpy2DToArray(imgarray, 0, 0, img_buffer[0], 
+                                    img_buffer[0].rowstride()*sizeof(float),
+                                    img_buffer[0].width()*sizeof(float), 
+                                    img_buffer[0].height(),
+                                    cudaMemcpyDeviceToDevice);
+                check_cuda_error("Error copying image to array");
             }
+            else
+            {
+                assert(!img_buffer.empty());
 
-            assert(!img_buffer.empty());
+                temp_buffer.resize(img_buffer.width(), img_buffer.height());
 
-            temp_buffer.resize(img_buffer.width(), img_buffer.height());
+                convert(&temp_buffer, &img_buffer);
 
-            convert(&temp_buffer, &img_buffer);
-
-            cudaMemcpy2DToArray(imgarray, 0, 0, temp_buffer, 
-                                temp_buffer.rowstride()*sizeof(float4),
-                                temp_buffer.width()*sizeof(float4), 
-                                temp_buffer.height(),
-                                cudaMemcpyDeviceToDevice);
-            check_cuda_error("Error copying image to array");
+                cudaMemcpy2DToArray(imgarray, 0, 0, temp_buffer, 
+                                    temp_buffer.rowstride()*sizeof(float4),
+                                    temp_buffer.width()*sizeof(float4), 
+                                    temp_buffer.height(),
+                                    cudaMemcpyDeviceToDevice);
+                check_cuda_error("Error copying image to array");
+            }
 
             cudaGraphicsUnmapResources(1,&cuda_output_resource, 0);
             check_cuda_error("Error unmapping output resource");
-
-            must_update_texture = false;
         }
         catch(...)
         {
@@ -225,9 +237,18 @@ void ImageFrame::set_grayscale(bool en)
 
     try
     {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 
-                     pimpl->img_buffer.width(), pimpl->img_buffer.height(), 0,
-                     GL_RGBA, GL_FLOAT, NULL);
+        if(en)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE32F_ARB,
+                         pimpl->img_buffer.width(),pimpl->img_buffer.height(),0,
+                         GL_LUMINANCE, GL_FLOAT, NULL);
+        }
+        else
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 
+                         pimpl->img_buffer.width(),pimpl->img_buffer.height(),0,
+                         GL_RGBA, GL_FLOAT, NULL);
+        }
         check_glerror();
 
         glBindTexture(GL_TEXTURE_2D, 0);
