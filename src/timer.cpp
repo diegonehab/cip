@@ -200,6 +200,12 @@ cpu_timer &timer_pool::cpu_add(const std::string &label, size_t data_size,
 
 std::string unit_value(double v, double base)
 {
+    if(isinf(v))
+        return "inf ";
+
+    if(isnan(v))
+        return "NaN ";
+
     const char *units[] = {"","k","M","G","T",NULL};
 
     const char **unit;
