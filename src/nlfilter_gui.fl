@@ -154,7 +154,7 @@ widget_class ParamLaplaceEdgeEnhancementUI {open
   }
 } 
 
-widget_class ParamYaroslavskiBilateralUI {open selected
+widget_class ParamYaroslavskyBilateralUI {open selected
   xywh {726 779 355 100} type Double
   class Fl_Group visible
 } {

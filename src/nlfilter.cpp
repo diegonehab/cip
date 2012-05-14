@@ -239,7 +239,7 @@ void *MainFrame::render_thread(MainFrame *frame)
                 op.threshold = panel->threshold->value();
             else if(const ParamLaplaceEdgeEnhancementUI *panel = dynamic_cast<const ParamLaplaceEdgeEnhancementUI *>(frame->m_param_panel))
                 op.multiple = panel->multiple->value();
-            else if(const ParamYaroslavskiBilateralUI *panel = dynamic_cast<const ParamYaroslavskiBilateralUI *>(frame->m_param_panel))
+            else if(const ParamYaroslavskyBilateralUI *panel = dynamic_cast<const ParamYaroslavskyBilateralUI *>(frame->m_param_panel))
             {
                 op.rho = panel->rho->value();
                 op.h = panel->h->value();
@@ -458,8 +458,8 @@ void MainFrame::on_choose_effect(effect_type effect)
         break;
     case EFFECT_YAROSLAVSKY_BILATERAL:
         {
-            ParamYaroslavskiBilateralUI *_panel 
-                = new ParamYaroslavskiBilateralUI(0,0,pw,ph);
+            ParamYaroslavskyBilateralUI *_panel 
+                = new ParamYaroslavskyBilateralUI(0,0,pw,ph);
             _panel->rho->callback(on_param_changed, this);
             _panel->h->callback(on_param_changed, this);
             panel = _panel;
