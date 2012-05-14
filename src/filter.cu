@@ -68,7 +68,8 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
                                      sampler(pos,2,0),sampler(pos,0,2),
                                      filter_op.rho, filter_op.h);
     case EFFECT_BRIGHTNESS_CONTRAST:
-        return brightness_contrast(sampler(pos),filter_op.brightness,filter_op.contrast);
+        return brightness_contrast(sampler(pos),filter_op.brightness,
+                                   filter_op.contrast);
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);
@@ -277,6 +278,11 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
     case EFFECT_YAROSLAVSKY_BILATERAL:
         filter_kernel1<EFFECT_YAROSLAVSKY_BILATERAL,C><<<gdim, bdim>>>(&temp);
         break;
+    case EFFECT_BRIGHTNESS_CONTRAST:
+        filter_kernel1<EFFECT_BRIGHTNESS_CONTRAST,C><<<gdim, bdim>>>(&temp);
+        break;
+    default:
+        assert(false);
     }
                    
     {

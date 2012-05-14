@@ -145,39 +145,39 @@ widget_class ParamReplacementUI {open
 } 
 
 widget_class ParamLaplaceEdgeEnhancementUI {open
-  xywh {1136 838 355 100} type Double
-  class Fl_Group visible
+  xywh {1136 838 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Value_Slider multiple {
     label {Multiple:}
-    xywh {85 10 265 25} type {Horz Knob} align 4 value 1 maximum 5
+    xywh {85 10 265 25} type {Horz Knob} align 4 maximum 5 value 1
   }
 } 
 
-widget_class ParamYaroslavskyBilateralUI {open selected
+widget_class ParamYaroslavskyBilateralUI {open
   xywh {726 779 355 100} type Double
   class Fl_Group visible
 } {
   Fl_Value_Slider rho {
     label {rho:}
-    xywh {40 10 310 25} type {Horz Knob} align 4 value 0.5 maximum 10
+    xywh {40 10 310 25} type {Horz Knob} align 4 maximum 10 value 0.5
   }
   Fl_Value_Slider h {
     label {h:}
-    xywh {40 45 310 25} type {Horz Knob} align 4 value 0.5 maximum 10
+    xywh {40 45 310 25} type {Horz Knob} align 4 maximum 10 value 0.5
   }
 } 
 
-widget_class ParamBrightnessContrastUI {open selected
+widget_class ParamBrightnessContrastUI {open
   xywh {726 779 355 100} type Double
   class Fl_Group visible
 } {
   Fl_Value_Slider brightness {
     label {brightness:}
-    xywh {40 10 310 25} type {Horz Knob} align 4 value 0 minimum -1 maximum 1
+    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -2 maximum 2
   }
   Fl_Value_Slider contrast {
-    label {contrast:}
-    xywh {40 45 310 25} type {Horz Knob} align 4 value 0 minimum -1 maximum 1
+    label {contrast:} selected
+    xywh {85 45 265 25} type {Horz Knob} align 4 minimum -2 maximum 2
   }
 } 
