@@ -173,11 +173,11 @@ widget_class ParamBrightnessContrastUI {open
   class Fl_Group visible
 } {
   Fl_Value_Slider brightness {
-    label {brightness:}
-    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -2 maximum 2
+    label {brightness:} selected
+    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -1
   }
   Fl_Value_Slider contrast {
-    label {contrast:} selected
-    xywh {85 45 265 25} type {Horz Knob} align 4 minimum -2 maximum 2
+    label {contrast:}
+    xywh {85 45 265 25} type {Horz Knob} align 4 minimum -1
   }
 } 

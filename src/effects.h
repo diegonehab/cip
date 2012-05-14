@@ -205,10 +205,6 @@ template <class T>
 __device__ inline
 T brightness_contrast(T v, float brightness, float contrast)
 {
-    // although we accept brightness values in the range [-1;1], the
-    // operation uses [-0.5;0.5], so let's remap it
-    brightness *= 0.5;
-
     if(brightness < 0)
         v *= (1+brightness);
     else
