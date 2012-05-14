@@ -99,6 +99,7 @@ MainFrame::MainFrame()
     m_effects->add("Laplacian",0,NULL,(void*)EFFECT_LAPLACIAN);
     m_effects->add("Laplace edge enhancement",0,NULL,(void*)EFFECT_LAPLACE_EDGE_ENHANCEMENT);
     m_effects->add("Yaroslavski bilateral",0,NULL,(void*)EFFECT_YAROSLAVSKY_BILATERAL);
+    m_effects->add("Brightness/contrast",0,NULL,(void*)EFFECT_BRIGHTNESS_CONTRAST);
     m_effects->value(0);
 
     // kicks off the render thread
@@ -242,6 +243,11 @@ void *MainFrame::render_thread(MainFrame *frame)
             {
                 op.rho = panel->rho->value();
                 op.h = panel->h->value();
+            }
+            else if(const ParamBrightnessContrastUI *panel = dynamic_cast<const ParamBrightnessContrastUI *>(frame->m_param_panel))
+            {
+                op.brightness = panel->brightness->value();
+                op.contrast = panel->contrast->value();
             }
             else if(const ParamReplacementUI *panel = dynamic_cast<const ParamReplacementUI *>(frame->m_param_panel))
             {
@@ -459,6 +465,15 @@ void MainFrame::on_choose_effect(effect_type effect)
             panel = _panel;
         }
         break;
+    case EFFECT_BRIGHTNESS_CONTRAST:
+        {
+            ParamBrightnessContrastUI *_panel 
+                = new ParamBrightnessContrastUI(0,0,pw,ph);
+            _panel->brightness->callback(on_param_changed, this);
+            _panel->contrast->callback(on_param_changed, this);
+            panel = _panel;
+        }
+        break;
     }
 
     if(m_param_panel)
@@ -552,6 +567,14 @@ filter_operation parse_filter_operation(const std::string &spec)
         if(c != ',')
             ss.setstate(std::ios::failbit);
     }
+    else if(opname == "brightness_contrast")
+    {
+        op.type = EFFECT_BRIGHTNESS_CONTRAST;
+        char c;
+        ss >> op.brightness >> c >> op.contrast;
+        if(c != ',')
+            ss.setstate(std::ios::failbit);
+    }
     else if(opname == "replacement")
     {
         op.type = EFFECT_REPLACEMENT;
@@ -590,6 +613,7 @@ void print_help(const char *progname)
             "  - laplacian[]\n"
             "  - laplace_edge_enhancement[mult]\n"
             "  - yaroslavsky_bilateral[rho,h]\n"
+            "  - brightness_contrast[brightness,contrast]\n"
             "\n"
             "without -o, shows a GUI\n";
 }

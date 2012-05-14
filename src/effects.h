@@ -199,4 +199,25 @@ T yaroslavsky_bilateral(T v, T dx, T dy, T dxy, T dxx, T dyy,
     return saturate(v + rho*rho*(f_tilde*ort + g_tilde*tan));
 }
 
+// brightness and contrast ---------------------------------------------
+
+template <class T>
+__device__ inline
+T brightness_contrast(T v, float brightness, float contrast)
+{
+    // although we accept brightness values in the range [-1;1], the
+    // operation uses [-0.5;0.5], so let's remap it
+    brightness *= 0.5;
+
+    if(brightness < 0)
+        v *= (1+brightness);
+    else
+        v += (1-v)*brightness;
+
+    const float PI = 3.14159265359;
+
+    float slant = tan((contrast+1)*PI/4);
+    return saturate((v-0.5)*slant + 0.5);
+}
+
 #endif

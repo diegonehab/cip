@@ -150,7 +150,7 @@ widget_class ParamLaplaceEdgeEnhancementUI {open
 } {
   Fl_Value_Slider multiple {
     label {Multiple:}
-    xywh {85 10 265 25} type {Horz Knob} align 4 value 0.5
+    xywh {85 10 265 25} type {Horz Knob} align 4 value 1 maximum 5
   }
 } 
 
@@ -160,10 +160,24 @@ widget_class ParamYaroslavskiBilateralUI {open selected
 } {
   Fl_Value_Slider rho {
     label {rho:}
-    xywh {40 10 310 25} type {Horz Knob} align 4 value 0.5
+    xywh {40 10 310 25} type {Horz Knob} align 4 value 0.5 maximum 10
   }
   Fl_Value_Slider h {
     label {h:}
-    xywh {40 45 310 25} type {Horz Knob} align 4 value 0.5
+    xywh {40 45 310 25} type {Horz Knob} align 4 value 0.5 maximum 10
+  }
+} 
+
+widget_class ParamBrightnessContrastUI {open selected
+  xywh {726 779 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Value_Slider brightness {
+    label {brightness:}
+    xywh {40 10 310 25} type {Horz Knob} align 4 value 0 minimum -1 maximum 1
+  }
+  Fl_Value_Slider contrast {
+    label {contrast:}
+    xywh {40 45 310 25} type {Horz Knob} align 4 value 0 minimum -1 maximum 1
   }
 } 
