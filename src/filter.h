@@ -25,7 +25,8 @@ enum effect_type
     EFFECT_GRADIENT_EDGE_DETECTION,
     EFFECT_LAPLACE_EDGE_ENHANCEMENT,
     EFFECT_YAROSLAVSKY_BILATERAL,
-    EFFECT_BRIGHTNESS_CONTRAST
+    EFFECT_BRIGHTNESS_CONTRAST,
+    EFFECT_HUE_SATURATION_LIGHTNESS
 };
 
 struct filter_operation
@@ -68,6 +69,12 @@ struct filter_operation
         struct
         {
             float brightness, contrast;
+        };
+
+        // hue, saturation and lightness
+        struct
+        {
+            float hue, saturation, lightness;
         };
     };
 };

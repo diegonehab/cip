@@ -100,6 +100,7 @@ MainFrame::MainFrame()
     m_effects->add("Laplace edge enhancement",0,NULL,(void*)EFFECT_LAPLACE_EDGE_ENHANCEMENT);
     m_effects->add("Yaroslavski bilateral",0,NULL,(void*)EFFECT_YAROSLAVSKY_BILATERAL);
     m_effects->add("Brightness and contrast",0,NULL,(void*)EFFECT_BRIGHTNESS_CONTRAST);
+    m_effects->add("Hue, saturation and lightness",0,NULL,(void*)EFFECT_HUE_SATURATION_LIGHTNESS);
     m_effects->value(0);
 
     // kicks off the render thread
@@ -252,6 +253,12 @@ void *MainFrame::render_thread(MainFrame *frame)
             {
                 op.brightness = panel->brightness->value();
                 op.contrast = panel->contrast->value();
+            }
+            else if(const ParamHueSaturationLightnessUI *panel = dynamic_cast<const ParamHueSaturationLightnessUI *>(frame->m_param_panel))
+            {
+                op.hue = panel->hue->value();
+                op.saturation = panel->saturation->value();
+                op.lightness = panel->lightness->value();
             }
             else if(const ParamReplacementUI *panel = dynamic_cast<const ParamReplacementUI *>(frame->m_param_panel))
             {
@@ -478,6 +485,16 @@ void MainFrame::on_choose_effect(effect_type effect)
             panel = _panel;
         }
         break;
+    case EFFECT_HUE_SATURATION_LIGHTNESS:
+        {
+            ParamHueSaturationLightnessUI *_panel 
+                = new ParamHueSaturationLightnessUI(0,0,pw,ph);
+            _panel->hue->callback(on_param_changed, this);
+            _panel->saturation->callback(on_param_changed, this);
+            _panel->lightness->callback(on_param_changed, this);
+            panel = _panel;
+        }
+        break;
     }
 
     if(m_param_panel)
@@ -579,6 +596,14 @@ filter_operation parse_filter_operation(const std::string &spec)
         if(c != ',')
             ss.setstate(std::ios::failbit);
     }
+    else if(opname == "hue_saturation_lightness")
+    {
+        op.type = EFFECT_HUE_SATURATION_LIGHTNESS;
+        char c[2];
+        ss >> op.hue >> c[0] >> op.saturation >> c[1] >> op.lightness;
+        if(c[0] != ',' || c[1] != ',')
+            ss.setstate(std::ios::failbit);
+    }
     else if(opname == "replacement")
     {
         op.type = EFFECT_REPLACEMENT;
@@ -595,9 +620,11 @@ filter_operation parse_filter_operation(const std::string &spec)
             }
         }
     }
+    else 
+        throw std::runtime_error("Effect not understood");
 
     if(!ss || ss.get()!=']' || (ss.get(),!ss.eof()))
-        throw std::runtime_error("Syntax error on effeect specification");
+        throw std::runtime_error("Syntax error on effect specification");
 
     return op;
 }
@@ -618,6 +645,7 @@ void print_help(const char *progname)
             "  - laplace_edge_enhancement[mult]\n"
             "  - yaroslavsky_bilateral[rho,h]\n"
             "  - brightness_contrast[brightness,contrast]\n"
+            "  - hue_saturation_lightness[hue,saturation,lightness]\n"
             "\n"
             "without -o, shows a GUI\n";
 }

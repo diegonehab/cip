@@ -70,6 +70,9 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
     case EFFECT_BRIGHTNESS_CONTRAST:
         return brightness_contrast(sampler(pos),filter_op.brightness,
                                    filter_op.contrast);
+    case EFFECT_HUE_SATURATION_LIGHTNESS:
+        return hue_saturation_lightness(sampler(pos),filter_op.hue,
+                                   filter_op.saturation,filter_op.lightness);
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);
@@ -280,6 +283,9 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
         break;
     case EFFECT_BRIGHTNESS_CONTRAST:
         filter_kernel1<EFFECT_BRIGHTNESS_CONTRAST,C><<<gdim, bdim>>>(&temp);
+        break;
+    case EFFECT_HUE_SATURATION_LIGHTNESS:
+        filter_kernel1<EFFECT_HUE_SATURATION_LIGHTNESS,C><<<gdim, bdim>>>(&temp);
         break;
     default:
         assert(false);

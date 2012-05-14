@@ -173,11 +173,29 @@ widget_class ParamBrightnessContrastUI {open
   class Fl_Group visible
 } {
   Fl_Value_Slider brightness {
-    label {brightness:} selected
-    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -1
+    label {brightness:}
+    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -1 maximum 1
   }
   Fl_Value_Slider contrast {
     label {contrast:}
-    xywh {85 45 265 25} type {Horz Knob} align 4 minimum -1
+    xywh {85 45 265 25} type {Horz Knob} align 4 minimum -1 maximum 0.999999
+  }
+} 
+
+widget_class ParamHueSaturationLightnessUI {open
+  xywh {736 789 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Value_Slider hue {
+    label {hue:} selected
+    xywh {85 8 265 25} type {Horz Knob} align 4 minimum -180 maximum 180
+  }
+  Fl_Value_Slider saturation {
+    label {saturation:}
+    xywh {85 38 265 25} type {Horz Knob} align 4 minimum -100 maximum 100
+  }
+  Fl_Value_Slider lightness {
+    label {lightness:}
+    xywh {85 68 265 25} type {Horz Knob} align 4 minimum -100 maximum 100
   }
 } 

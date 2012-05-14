@@ -216,4 +216,128 @@ T brightness_contrast(T v, float brightness, float contrast)
     return saturate((v-0.5)*slant + 0.5);
 }
 
+// hue, saturation and lightness -----------------------------------
+
+__device__ inline
+float3 rgb2hsl(float3 rgb)
+{
+    float3 hsl;
+
+    float M,m,C,h_prime;
+
+    M = fmax(fmax(rgb.x, rgb.y), rgb.z);
+    m = fmin(fmin(rgb.x, rgb.y), rgb.z);
+    C = M-m;
+
+
+    if (C == 0.f) 
+        h_prime = 100.f; //too big value for h_prime means H is not defined!    
+
+    if (M == rgb.x) 
+        h_prime = fmod((rgb.y-rgb.z)/C,6.f);
+    else if (M==rgb.y) 
+        h_prime = ((rgb.z-rgb.x)/C)+2.f;
+    else h_prime = ((rgb.x-rgb.y)/C)+4.f;
+
+    hsl.x = 60.f*h_prime;
+    hsl.z = 0.5f*(M+m);
+    if (C==0) 
+        hsl.y = 0.f;
+    else 
+        hsl.y = C/(1.f-fabs(2*(hsl.z)-1));
+
+    return hsl;
+}
+
+__device__ inline
+float3 hsl2rgb(float3 hsl)
+{
+    float C,h_prime,X,r1,g1,b1,m;
+
+    C = (1-fabs(2*(hsl.z)-1.f))*(hsl.y);
+    h_prime = (hsl.x)/60.f;
+    X = C*(1-fabs(fmod(h_prime,2.f)-1.f));
+
+    if (h_prime<1.f) {
+        r1 = C;
+        g1 = X;
+        b1 = 0.f;
+    }   
+    else if (h_prime<2.f){
+        r1 = X;
+        g1 = C; 
+        b1 = 0.f;
+    }   
+    else if (h_prime<3.f){
+        r1 = 0.f;
+        g1 = C;
+        b1 = X; 
+    }   
+    else if (h_prime<4.f){
+        r1 = 0.f;
+        g1 = X; 
+        b1 = C;
+    }   
+    else if (h_prime<5.f){
+        r1 = X;
+        g1 = 0.f;
+        b1 = C;
+    }   
+    else if (h_prime<6.f) {
+        r1 = C;
+        g1 = 0.f;
+        b1 = X;
+    }
+    else { // undefined value of H is mapped to (0,0,0)
+        r1 = 0.f;
+        g1 = 0.f;
+        b1 = 0.f;
+    } 
+
+    m = hsl.z - C/2.f;
+
+    float3 rgb;
+
+    rgb.x = r1+m;
+    rgb.y = g1+m;
+    rgb.z = b1+m;
+
+    return rgb;
+}
+
+
+__device__ inline
+float3 hue_saturation_lightness(float3 v, float hue, float saturation,
+                                float lightness)
+{
+    float3 hsl = rgb2hsl(v);
+
+    if(hsl.x+hue < 0)
+        hsl.x += 360 + hue;
+    else if(hsl.x+hue > 360)
+        hsl.x += hue-360;
+    else
+        hsl.x += hue;
+
+    saturation /= 100;
+    hsl.y = saturate(hsl.y*(1 + saturation));
+
+    lightness = lightness/100 * 0.5;
+    if(lightness < 0)
+        hsl.z = saturate(hsl.z*(1 + lightness));
+    else
+        hsl.z = saturate(hsl.z + (1-hsl.z)*lightness);
+
+    return hsl2rgb(hsl);
+}
+
+
+// this makes no sense whatsoever, but is included for completeness
+__device__ inline
+float hue_saturation_lightness(float v, float hue, float saturation,
+                               float lightness)
+{
+    return grayscale(hue_saturation_lightness(make_float3(v,v,v),hue,saturation,lightness));
+}
+
 #endif
