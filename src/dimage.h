@@ -299,6 +299,8 @@ public:
     HOSTDEV
     int channelstride() const { return rowstride()*height(); } 
 
+    HOSTDEV
+    bool empty() const { return rowstride()==0 || height()==0; }
 
     HOSTDEV
     int offset_at(int x, int y) const

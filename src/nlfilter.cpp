@@ -159,6 +159,9 @@ void call_filter(dimage_ptr<T,C> out,
                  const filter_operation &op,
                  int flags=0)
 {
+    assert(!in.empty());
+    assert(!out.empty());
+
     int imgsize = in.width()*in.height();
 
     base_timer *timerzao = NULL, *timer = NULL;
@@ -189,6 +192,7 @@ void call_filter(dimage_ptr<T,C> out,
 
     for(int i=0; i<C; ++i)
         recursive_filter_5(out[i]);
+
 
     if(timer)
         timer->stop();

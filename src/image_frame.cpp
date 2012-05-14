@@ -190,12 +190,14 @@ void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
     d_img.copy_from_host(data, w, h);
 
     pimpl->img_input.resize(w,h);
-
     convert(&pimpl->img_input, &d_img);
     grayscale(pimpl->img_input_grayscale, &d_img);
 
     // to create textures and setup output buffers
     set_grayscale(pimpl->grayscale);
+
+    pimpl->img_buffer.resize(w,h);
+    pimpl->img_backbuffer.resize(w,h);
 
     resize(x(),y(),w,h);
 
@@ -255,13 +257,8 @@ void ImageFrame::swap_buffers()
 
     rod::unique_lock lk(pimpl->mtx_buffers);
 
-    int nchannels = pimpl->grayscale ? 1 : 3;
-
-    assert(!pimpl->img_backbuffer.empty());
-    if(pimpl->img_backbuffer.empty())
-        throw std::runtime_error("Invalid backbuffer");
-
-    swap(pimpl->img_backbuffer, pimpl->img_buffer);
+    if(!pimpl->img_backbuffer.empty())
+        swap(pimpl->img_backbuffer, pimpl->img_buffer);
 
     lk.unlock();
 
