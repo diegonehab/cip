@@ -3,7 +3,7 @@
 #include <FL/Fl_Color_Chooser.H>
 #include <vector>
 #include <cuda_gl_interop.h>
-#include <unistd.h> // for getopt
+#include <getopt.h> // for getopt
 #include "image_util.h"
 #include "recfilter.h"
 #include "timer.h"
@@ -642,7 +642,7 @@ filter_operation parse_filter_operation(const std::string &spec)
         }
     }
     else 
-        throw std::runtime_error("Effect not understood");
+        throw std::runtime_error("Bad effect type");
 
     if(!ss || ss.get()!=']' || (ss.get(),!ss.eof()))
         throw std::runtime_error("Syntax error on effect specification");
@@ -650,9 +650,19 @@ filter_operation parse_filter_operation(const std::string &spec)
     return op;
 }
 
+filter_type parse_filter_type(const std::string &name)
+{
+    if(name == "bspline3")
+        return FILTER_BSPLINE3;
+    else if(name == "card-bspline3")
+        return FILTER_CARDINAL_BSPLINE3;
+    else
+        throw std::runtime_error("Bad filter type");
+}
+
 void print_help(const char *progname)
 {
-    std::cout << "Usage: " << progname << "  [-e effect_descr] [-o output_file] [input_file]\n"
+    std::cout << "Usage: " << progname << " [--post post_filter] [--pre pre_filter] [-e/--effect effect_descr] [-o/--output output_file] [-h/--help] [input_file]\n"
             " where effect_descr is one of:\n"
             "  - identity[]\n"
             "  - posterize[levels]\n"
@@ -668,6 +678,10 @@ void print_help(const char *progname)
             "  - brightness_contrast[brightness,contrast]\n"
             "  - hue_saturation_lightness[hue,saturation,lightness]\n"
             "\n"
+            " pre_filter and post_filter are:\n"
+            "  - bspline3\n"
+            "  - card-bspline3\n"
+            "\n"
             "without -o, shows a GUI\n";
 }
 
@@ -679,12 +693,31 @@ int main(int argc, char *argv[])
                     outfile,
                     effect = "identity[]";
         bool do_grayscale = false;
+        filter_type prefilter = FILTER_CARDINAL_BSPLINE3,
+                    postfilter = FILTER_CARDINAL_BSPLINE3;
 
-        int opt;
-        while((opt = getopt(argc, argv, "-hgo:e:")) != -1)
+
+        static struct option long_options[] = {
+            {"pre",required_argument,0,0},
+            {"post",required_argument,0,0},
+            {"help",required_argument,0,'h'},
+            {"effect",required_argument,0,'e'},
+            {"output",required_argument,0,'o'},
+            {0,0,0,0}
+        };
+
+        int opt, optindex;
+        while((opt = getopt_long(argc, argv, "-hgo:e:",
+                                 long_options, &optindex)) != -1)
         {
             switch(opt)
             {
+            case 0:
+                if(long_options[optindex].name == std::string("pre"))
+                    prefilter = parse_filter_type(optarg);
+                else if(long_options[optindex].name == std::string("post"))
+                    postfilter = parse_filter_type(optarg);
+                break;
             case 'h':
                 print_help(basename(argv[0]));
                 return 0;
@@ -715,6 +748,9 @@ int main(int argc, char *argv[])
                 throw std::runtime_error("Must specify an input image");
 
             filter_operation op = parse_filter_operation(effect);
+
+            op.pre_filter = prefilter;
+            op.post_filter = postfilter;
 
             std::vector<uchar4> imgdata;
             int width, height;
