@@ -213,7 +213,7 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
         in += in.rowstride()-mj;
     }
 
-    *out = filter_traits<C>::normalize_sum(sum);
+    *out = lrgb2srgb(filter_traits<C>::normalize_sum(sum));
 }/*}}}*/
 
 template <int C>

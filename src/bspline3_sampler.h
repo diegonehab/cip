@@ -43,12 +43,16 @@ public:
     typedef S sampler_type;
     typedef typename S::result_type result_type;
 
+    // accepts texture in gamma space
+    // returns result in linear space
     __device__ inline 
     result_type operator()(float2 pos, int kx=0, int ky=0) const
     {
         S sampler;
 
         pos -= 0.5f;
+
+        result_type value;
 
 #if USE_FAST_CUBIC_INTERPOLATION
         if(kx < 2 && ky < 2)
@@ -86,9 +90,9 @@ public:
             }
 
             if(kx == 0)
-                return lerp(tex10, tex00, g0.x);
+                value = lerp(tex10, tex00, g0.x);
             else
-                return (tex00 - tex10)*g0.x;
+                value = (tex00 - tex10)*g0.x;
         }
         else if(kx == 2 && ky < 2)
         {
@@ -130,7 +134,7 @@ public:
             }
 
             // weigh along the x-direction
-            return tex00-2*tex10+tex20;
+            value = tex00-2*tex10+tex20;
         }
         else if(ky == 2 && kx < 2)
         {
@@ -163,9 +167,9 @@ public:
 
             // weigh along the x-direction
             if(kx == 0)
-                return lerp(tex10, tex00, g0);
+                value = lerp(tex10, tex00, g0);
             else
-                return (tex10 - tex00)*g0;
+                value = (tex10 - tex00)*g0;
         }
         else
         {
@@ -187,7 +191,7 @@ public:
             tex20 = tex20-2*tex21+tex22;
 
             // weigh along the x-direction
-            return tex00-2*tex10+tex20;
+            value = tex00-2*tex10+tex20;
         }
 #else
         float2 index = floor(pos);
@@ -198,18 +202,18 @@ public:
         bspline3_weights(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
         bspline3_weights(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
 
-        result_type tex = cuda_traits<result_type>::make(0);
+        value = cuda_traits<result_type>::make(0);
 
 #pragma unroll
         for(int i=0; i<4; ++i)
         {
 #pragma unroll
             for(int j=0; j<4; ++j)
-                tex += sampler(index.x+0.5f+j-1,index.y+0.5f+i-1)*w[i].y*w[j].x;
+                value += sampler(index.x+0.5f+j-1,index.y+0.5f+i-1)*w[i].y*w[j].x;
         }
-
-        return tex;
 #endif
+
+        return srgb2lrgb(value);
     }
 };
 
