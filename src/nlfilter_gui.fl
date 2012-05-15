@@ -3,11 +3,11 @@ version 1.0300
 header_name {.h} 
 code_name {.cxx}
 widget_class MainFrameUI {open
-  xywh {1055 418 595 125} type Double hide
-  class Fl_Double_Window
+  xywh {930 418 720 155} type Double
+  class Fl_Double_Window visible
 } {
   Fl_Menu_Bar {} {open
-    xywh {0 0 595 25}
+    xywh {0 0 720 25}
   } {
     Submenu {} {
       label {&File} open
@@ -35,37 +35,45 @@ widget_class MainFrameUI {open
       }
     }
   }
-  Fl_Choice m_effects {
-    label {Effect:}
-    callback on_choose_effect open
-    xywh {55 30 170 25} down_box BORDER_BOX
+  Fl_Choice m_post_filter {
+    label {Post-filter} open
+    xywh {73 30 272 25} down_box BORDER_BOX
   } {}
   Fl_Return_Button {} {
     label Apply
     callback on_apply_effect
-    xywh {5 88 85 25}
+    xywh {5 119 75 25}
   }
   Fl_Button {} {
     label Undo
     callback on_undo_effect
-    xywh {170 88 55 25}
+    xywh {85 119 55 25}
   }
-  Fl_Group m_param_group {open
-    xywh {235 25 360 100} align 5
+  Fl_Group m_param_group {open selected
+    xywh {350 31 366 120} align 5
   } {}
   Fl_Value_Output m_status_fps {
     label FPS
-    xywh {485 0 75 25} align 8
+    xywh {612 0 75 25} align 8
   }
   Fl_Value_Output m_status_rate {
     label {GP/s}
-    xywh {340 0 90 25} align 8
+    xywh {467 0 90 25} align 8
   }
   Fl_Light_Button m_grayscale {
     label Grayscale
     callback on_change_grayscale
-    xywh {135 55 90 25}
+    xywh {152 119 90 25}
   }
+  Fl_Choice m_effects {
+    label {Effect:}
+    callback on_choose_effect open
+    xywh {73 60 272 25} down_box BORDER_BOX
+  } {}
+  Fl_Choice m_pre_filter {
+    label {Pre-filter} open
+    xywh {73 90 272 25} down_box BORDER_BOX
+  } {}
 } 
 
 widget_class ParamPosterizeUI {open
@@ -119,8 +127,8 @@ widget_class ParamThresholdUI {open
 } 
 
 widget_class ParamReplacementUI {open
-  xywh {882 615 355 100} type Double
-  class Fl_Group visible
+  xywh {882 615 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Button old_color {
     label {Old Color}
@@ -155,8 +163,8 @@ widget_class ParamLaplaceEdgeEnhancementUI {open
 } 
 
 widget_class ParamYaroslavskyBilateralUI {open
-  xywh {726 779 355 100} type Double
-  class Fl_Group visible
+  xywh {726 779 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Value_Slider rho {
     label {rho:}
@@ -169,12 +177,12 @@ widget_class ParamYaroslavskyBilateralUI {open
 } 
 
 widget_class ParamBrightnessContrastUI {open
-  xywh {726 779 355 100} type Double
-  class Fl_Group visible
+  xywh {726 779 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Value_Slider brightness {
     label {brightness:}
-    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -1 maximum 1
+    xywh {85 10 265 25} type {Horz Knob} align 4 minimum -1
   }
   Fl_Value_Slider contrast {
     label {contrast:}
@@ -183,11 +191,11 @@ widget_class ParamBrightnessContrastUI {open
 } 
 
 widget_class ParamHueSaturationLightnessUI {open
-  xywh {736 789 355 100} type Double
-  class Fl_Group visible
+  xywh {1258 716 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Value_Slider hue {
-    label {hue:} selected
+    label {hue:}
     xywh {85 8 265 25} type {Horz Knob} align 4 minimum -180 maximum 180
   }
   Fl_Value_Slider saturation {

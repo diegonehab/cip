@@ -81,7 +81,7 @@ private:
 };
 
 MainFrame::MainFrame()
-    : MainFrameUI(753,319,595,125, "NLFilter")
+    : MainFrameUI(753,319,720,155, "NLFilter")
     , m_render_thread((void(*)(void*))&MainFrame::render_thread, this, false)
     , m_param_panel(NULL)
     , m_image_frame(NULL)
@@ -102,6 +102,18 @@ MainFrame::MainFrame()
     m_effects->add("Brightness and contrast",0,NULL,(void*)EFFECT_BRIGHTNESS_CONTRAST);
     m_effects->add("Hue, saturation and lightness",0,NULL,(void*)EFFECT_HUE_SATURATION_LIGHTNESS);
     m_effects->value(0);
+
+    Fl_Callback *on_param_changed = (Fl_Callback *)&MainFrame::on_param_changed;
+
+    m_pre_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
+    m_pre_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
+    m_pre_filter->value(1);
+    m_pre_filter->callback(on_param_changed, this);
+
+    m_post_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
+    m_post_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
+    m_post_filter->value(1);
+    m_post_filter->callback(on_param_changed, this);
 
     // kicks off the render thread
     m_render_thread.start();
@@ -169,15 +181,18 @@ void call_filter(dimage_ptr<T,C> out,
     if(flags & VERBOSE)
         timerzao = &timers.cpu_add("Filter",imgsize,"P");
 
-    // convolve with a bpsline3^-1 to make a cardinal post-filter
-    if(flags & VERBOSE)
-        timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
+    if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        // convolve with a bpsline3^-1 to make a cardinal post-filter
+        if(flags & VERBOSE)
+            timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
 
-    for(int i=0; i<C; ++i)
-        recursive_filter_5(out[i], in[i]);
+        for(int i=0; i<C; ++i)
+            recursive_filter_5(out[i], in[i]);
 
-    if(timer)
-        timer->stop();
+        if(timer)
+            timer->stop();
+    }
 
     // do actual filtering
     if(flags & VERBOSE)
@@ -187,16 +202,18 @@ void call_filter(dimage_ptr<T,C> out,
     if(timer)
         timer->stop();
 
-    // convolve with a bpsline3^-1 to make a cardinal pre-filter
-    if(flags & VERBOSE)
-        timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
+    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        // convolve with a bpsline3^-1 to make a cardinal pre-filter
+        if(flags & VERBOSE)
+            timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
 
-    for(int i=0; i<C; ++i)
-        recursive_filter_5(out[i]);
+        for(int i=0; i<C; ++i)
+            recursive_filter_5(out[i]);
 
-
-    if(timer)
-        timer->stop();
+        if(timer)
+            timer->stop();
+    }
 
     if(timerzao)
         timerzao->stop();
@@ -231,6 +248,10 @@ void *MainFrame::render_thread(MainFrame *frame)
             filter_operation op;
 
             op.type = (effect_type)(ptrdiff_t)frame->m_effects->mvalue()->user_data_;
+
+            op.pre_filter = (filter_type)(ptrdiff_t)frame->m_pre_filter->mvalue()->user_data_;
+            op.post_filter = (filter_type)(ptrdiff_t)frame->m_post_filter->mvalue()->user_data_;
+
 
             if(const ParamPosterizeUI *panel = dynamic_cast<const ParamPosterizeUI *>(frame->m_param_panel))
                 op.levels = std::max<int>(2,panel->levels->value());
@@ -837,12 +858,12 @@ void on_undo_effect(Fl_Button *m, void*)/*{{{*/
     }
     CATCH()
 }/*}}}*/
-void on_change_grayscale(Fl_Light_Button*lb, void*)
+void on_change_grayscale(Fl_Light_Button*lb, void*)/*{{{*/
 {
     try
     {
         get_frame(lb)->on_change_grayscale(lb->value());
     }
     CATCH()
-}
+}/*}}}*/
 /*}}}*/

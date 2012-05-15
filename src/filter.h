@@ -29,9 +29,17 @@ enum effect_type
     EFFECT_HUE_SATURATION_LIGHTNESS
 };
 
+enum filter_type
+{
+    FILTER_BSPLINE3,
+    FILTER_CARDINAL_BSPLINE3
+};
+
 struct filter_operation
 {
     effect_type type;
+
+    filter_type pre_filter, post_filter;
 
     union
     {
