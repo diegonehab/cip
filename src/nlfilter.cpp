@@ -193,6 +193,8 @@ void call_filter(dimage_ptr<T,C> out,
         if(timer)
             timer->stop();
     }
+    else
+        out = in;
 
     // do actual filtering
     if(flags & VERBOSE)
