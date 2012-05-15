@@ -317,9 +317,8 @@ public:
 
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(&m_data[i*channelstride()], width()*sizeof(texel_type), 
-                         &img+i*img.channelstride(), 
-                         rowstride()*sizeof(texel_type), 
+            cudaMemcpy2D((*this)[i], rowstride()*sizeof(texel_type), 
+                         img[i], rowstride()*sizeof(texel_type), 
                          width()*sizeof(texel_type), height(), 
                          cudaMemcpyDeviceToDevice);
         }
