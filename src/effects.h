@@ -3,6 +3,45 @@
 
 #include "math_util.h"
 
+// maps to/from gamma space from/to linear space ------------------------------
+
+// apply sRGB non-linearity to value
+__device__ inline 
+float lrgb2srgb(float v)
+{
+    v = saturate(v);
+    const float a = 0.055f;
+    if(v <= 0.0031308f)
+        return 12.92f*v;
+    else
+        return (1.f+a)*powf(v,1.f/2.4f)-a;
+}
+
+__device__ inline 
+float3 lrgb2srgb(float3 v)
+{
+    return make_float3(lrgb2srgb(v.x),lrgb2srgb(v.y),lrgb2srgb(v.z));
+}
+
+// remove sRGB non-linearity from value
+__device__ inline 
+float srgb2lrgb(float v)
+{
+    v = saturate(v);
+    const float a = 0.055f;
+    if(v <= 0.04045f)
+        return v/12.92f;
+    else
+        return powf((v+a)/(1.f+a),2.4f);
+}
+
+__device__ inline 
+float3 srgb2lrgb(float3 v)
+{
+    return make_float3(srgb2lrgb(v.x), srgb2lrgb(v.y), srgb2lrgb(v.z));
+}
+
+
 // posterize ------------------------------------------------------------
 
 template <class T>
