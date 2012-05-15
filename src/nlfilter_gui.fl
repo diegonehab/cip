@@ -158,7 +158,7 @@ widget_class ParamLaplaceEdgeEnhancementUI {open
 } {
   Fl_Value_Slider multiple {
     label {Multiple:}
-    xywh {85 10 265 25} type {Horz Knob} align 4 maximum 5 value 1
+    xywh {85 10 265 25} type {Horz Knob} align 4 maximum 100 value 1
   }
 } 
 
