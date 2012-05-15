@@ -137,7 +137,7 @@ template <class T>
 __device__ inline 
 T laplace_edge_enhancement(T v, T dxx, T dyy, float multiple)
 {
-    return saturate(v - multiple*(dxx-dyy));
+    return saturate(v - multiple*(dxx+dyy));
 }
 
 // yaroslavsky bilateral --------------------------------------------
