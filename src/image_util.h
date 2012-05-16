@@ -41,4 +41,13 @@ void load_image(const std::string &fname, std::vector<uchar4> *data,
 void save_image(const std::string &fname, const std::vector<uchar4> &data,
                 int width, int height);
 
+template <class T, int C, class U, int D>
+void lrgb2srgb(dimage_ptr<T,C> out, dimage_ptr<const U,D> in);
+
+template <class T, int C, class U, int D>
+void lrgb2srgb(dimage_ptr<T,C> out, dimage_ptr<U,D> in)
+{
+    lrgb2srgb(out, static_cast<dimage_ptr<const U,D> >(in));
+}
+
 #endif

@@ -5,6 +5,7 @@
 #include <cutil.h>
 #include "symbol.h"
 #include "math_util.h"
+#include "effects.h"
 #include "image_util.h"
 
 #define USE_LAUNCH_BOUNDS 1
@@ -101,6 +102,48 @@ template void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3> in);
 template void convert(dimage_ptr<float3> out, dimage_ptr<const float> in);
 template void convert(dimage_ptr<float,3> out, dimage_ptr<const float> in);
 template void convert(dimage_ptr<uchar3> out, dimage_ptr<const float> in);
+
+// lrgb2srgb ------------------------------------------------------------
+
+
+template <class T, int C, class U, int D>
+__global__
+#if USE_LAUNCH_BOUNDS
+__launch_bounds__(BW*BH, NB)
+#endif
+void lrgb2srgb_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,/*{{{*/
+    typename enable_if<pixel_traits<T>::is_integral == pixel_traits<U>::is_integral>::type*)
+{
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
+
+    if(!in.is_inside(x,y))
+        return;
+
+    int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
+
+    *out = lrgb2srgb(*in);
+}/*}}}*/
+
+template <class T, int C, class U, int D>
+void lrgb2srgb(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
+{
+    if(out.width() != in.width() || out.height() != in.height())
+        throw std::runtime_error("Image dimensions don't match");
+
+    dim3 bdim(BW,BH),
+         gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
+
+    lrgb2srgb_kernel<<<gdim, bdim>>>(out, in, (void *)NULL);
+}
+
+template void lrgb2srgb(dimage_ptr<float3> out, dimage_ptr<const float3> in);
+template void lrgb2srgb(dimage_ptr<float3> out, dimage_ptr<const float,3> in);
+template void lrgb2srgb(dimage_ptr<float,3> out, dimage_ptr<const float,3> in);
+template void lrgb2srgb(dimage_ptr<float> out, dimage_ptr<const float> in);
 
 // grayscale ------------------------------------------------------------
 
