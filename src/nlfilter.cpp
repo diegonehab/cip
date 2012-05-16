@@ -217,6 +217,14 @@ void call_filter(dimage_ptr<T,C> out,
             timer->stop();
     }
 
+    // maps back to gamma space
+    if(flags & VERBOSE)
+        timer = &timers.cpu_add("linear to gamma",imgsize,"P");
+    lrgb2srgb(out, out);
+    if(flags & VERBOSE)
+        timer->stop();
+
+
     if(timerzao)
         timerzao->stop();
 
