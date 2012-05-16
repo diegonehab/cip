@@ -152,8 +152,8 @@ void setup_recursive_filter(int width, int height, int rowstride)
 
     if(cur_width != width || cur_height!=height || cur_rowstride!=rowstride)
     {
-        recursive_filter_5_setup(width,height,rowstride,
-                                 weights, CLAMP_TO_EDGE, 1);
+        recursive_filter_5_setup<1>(width,height,rowstride,
+                                    weights, CLAMP_TO_EDGE, 1);
 
         cur_width = width;
         cur_height = height;

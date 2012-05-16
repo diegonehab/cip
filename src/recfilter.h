@@ -11,8 +11,6 @@
 #include "image.h"
 #include "linalg.h"
 
-#define ORDER 1
-
 #ifdef  __CUDA_ARCH__
 #   ifdef assert
 #       undef assert
@@ -249,8 +247,9 @@ Matrix<T,R,N> tailT(const Matrix<T,M,N> &mat)
 }
 
 typedef float pixel_type;
+template <int R>
 void recursive_filter_5_setup(int width, int height, int rowstride,
-                              const Vector<float, ORDER+1> &w,
+                              const Vector<float, R+1> &w,
                               BorderType border_type=CLAMP_TO_ZERO, 
                               int border=1);
 void recursive_filter_5_free();

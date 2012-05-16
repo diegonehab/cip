@@ -27,9 +27,6 @@
 #include "recfilter.h"
 #include "image.h"
 
-
-const int WS = 32;
-
 #if CUDA_SM >= 20
 #   define W1 8
 #   define NB1 6
@@ -66,23 +63,63 @@ parameter; f_ surface.
 
 */
 
-__constant__ int c5_width, c5_height, c5_rowstride,
-                 c5_adj_width, c5_adj_height,
-                 c5_m_size, // number of column-blocks,
-                 c5_n_size, // number of row-blocks,
-                 c5_last_m, c5_last_n,
+// from boost::preprocessor
+
+#define BOOST_PP_CAT(a, b) BOOST_PP_CAT_I(a, b)
+#define BOOST_PP_CAT_I(a, b) a ## b
+
+#define PREFIX(x) BOOST_PP_CAT(BOOST_PP_CAT(c5_, ORDER),_##x)
+
+#define c_width PREFIX(width)
+#define c_height PREFIX(height)
+#define c_rowstride PREFIX(rowstride)
+#define c_adj_width PREFIX(adj_width)
+#define c_adj_height PREFIX(adj_height)
+#define c_m_size PREFIX(m_size)
+#define c_n_size PREFIX(n_size)
+#define c_last_m PREFIX(last_m)
+#define c_last_n PREFIX(last_n)
+#define c_border PREFIX(border)
+#define c_inv_width PREFIX(inv_width)
+#define c_inv_height PREFIX(inv_height)
+#define c_weights PREFIX(weights)
+#define c_AbF_T PREFIX(AbF_T)
+#define c_AbR_T PREFIX(AbR_T)
+#define c_HARB_AFP_T PREFIX(HARB_AFP_T)
+#define c_AbF PREFIX(AbF)
+#define c_AbR PREFIX(AbR)
+#define c_HARB_AFP PREFIX(HARB_AFP)
+#define c_ARE_T PREFIX(ARE_T)
+#define c_HARB_AFB PREFIX(HARB_AFB)
+#define c_TAFB PREFIX(TAFB)
+#define c_ARB_AFP_T PREFIX(ARB_AFP_T)
+
+__constant__ int c_width, c_height, c_rowstride,
+                 c_adj_width, c_adj_height,
+                 c_m_size, // number of column-blocks,
+                 c_n_size, // number of row-blocks,
+                 c_last_m, c_last_n,
                  c_border;
-__constant__ float c5_inv_with, c5_inv_height;
+__constant__ float c_inv_width, c_inv_height;
 
-__constant__ Vector<float,ORDER+1> c5_weights;
+__constant__ Vector<float,ORDER+1> c_weights;
 
-__constant__ Matrix<float,ORDER,ORDER> c5_AbF_T, c5_AbR_T, c5_HARB_AFP_T,
-                               c5_AbF, c5_AbR, c5_HARB_AFP;
-__constant__ Matrix<float,ORDER,WS> c5_ARE_T, c5_HARB_AFB, c5_TAFB, c5_ARB_AFP_T;
+__constant__ Matrix<float,ORDER,ORDER> c_AbF_T, c_AbR_T, 
+                                       c_HARB_AFP_T,
+                               c_AbF, c_AbR, c_HARB_AFP;
+__constant__ Matrix<float,ORDER,WS> c_ARE_T, c_HARB_AFB, 
+                                    c_TAFB, c_ARB_AFP_T;
 
+
+#ifndef TEXTURE_DEFINED
+#define TEXTURE_DEFINED 1
 texture<float, cudaTextureType2D, cudaReadModeElementType> t_in;
+#endif
 
 //=== IMPLEMENTATION ==========================================================
+
+#ifndef AUX_FUNCS_DEFINED
+#define AUX_FUNCS_DEFINED 1
 
 template <int W, int U, int V>
 __device__
@@ -244,6 +281,8 @@ void mad(Matrix<T,R,WS> &r,  const Matrix<T,R,WS> &a,
     mad(r, rint, (const Matrix<T,R,WS> &)c[0][tx]);
 }
 
+#endif
+
 /**
  *  @brief Algorithm 5 stage 1
  *
@@ -259,15 +298,14 @@ void mad(Matrix<T,R,WS> &r,  const Matrix<T,R,WS> &a,
  *  @param[out] g_ucheck All $P^\T_{m,n}(\check{U})$
  *  @param[out] g_vtilde All $E^\T_{m,n}(\tilde{V})$
  */
-template <int R>
 __global__
 #if NB1
 __launch_bounds__(WS*W1, NB1)
 #endif
-void collect_carries(Matrix<float,R,WS> *g_pybar, 
-                     Matrix<float,R,WS> *g_ezhat,
-                     Matrix<float,R,WS> *g_ptucheck, 
-                     Matrix<float,R,WS> *g_etvtilde)
+void collect_carries(Matrix<float,ORDER,WS> *g_pybar, 
+                     Matrix<float,ORDER,WS> *g_ezhat,
+                     Matrix<float,ORDER,WS> *g_ptucheck, 
+                     Matrix<float,ORDER,WS> *g_etvtilde)
 {
     int tx = threadIdx.x, ty = threadIdx.y, 
 #if CUDA_SM >= 20
@@ -286,11 +324,11 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 #endif
 
     // load data into shared memory
-    read_block<W1>(block, m, n, c5_inv_with, c5_inv_height);
+    read_block<W1>(block, m, n, c_inv_width, c_inv_height);
 
 #if CUDA_SM >= 20
     m += ty;
-    if(m >= c5_m_size)
+    if(m >= c_m_size)
         return;
 #endif
 
@@ -303,50 +341,50 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
 #endif
     {
 
-        Matrix<float,R,WS> 
-            &pybar = (Matrix<float,R,WS>&)g_pybar[n*c5_m_size+m][0][tx],
-            &ezhat = (Matrix<float,R,WS>&)g_ezhat[n*c5_m_size+m][0][tx],
-            &ptucheck = (Matrix<float,R,WS>&)g_ptucheck[n*c5_m_size+m][0][tx],
-            &etvtilde = (Matrix<float,R,WS>&)g_etvtilde[n*c5_m_size+m][0][tx];
+        Matrix<float,ORDER,WS> 
+            &pybar = (Matrix<float,ORDER,WS>&)g_pybar[n*c_m_size+m][0][tx],
+            &ezhat = (Matrix<float,ORDER,WS>&)g_ezhat[n*c_m_size+m][0][tx],
+            &ptucheck = (Matrix<float,ORDER,WS>&)g_ptucheck[n*c_m_size+m][0][tx],
+            &etvtilde = (Matrix<float,ORDER,WS>&)g_etvtilde[n*c_m_size+m][0][tx];
 
-        const float B0_1 = c5_weights[0], B0_2 = B0_1*B0_1,
+        const float B0_1 = c_weights[0], B0_2 = B0_1*B0_1,
                     B0_3 = B0_2*B0_1, B0_4 = B0_2*B0_2;
         {
             float *bdata = block[tx+ty*WS];
 
             // calculate pybar, scan left -> right
             {
-                Vector<float,R> p = zeros<float,R>();
+                Vector<float,ORDER> p = zeros<float,ORDER>();
 
-                p[R-1] = *bdata++;
+                p[ORDER-1] = *bdata++;
 
 #pragma unroll
                 for(int j=1; j<WS; ++j, ++bdata)
                 {
 #if CUDA_SM >= 20 || ORDER>1
-                    *bdata = fwd(p, *bdata, c5_weights);
+                    *bdata = fwd(p, *bdata, c_weights);
 #else
-                    *bdata = p[0] = rec_op(*bdata, p[0]*c5_weights[1]);
+                    *bdata = p[0] = rec_op(*bdata, p[0]*c_weights[1]);
 #endif
                 }
 
-                if(m < c5_m_size-1)
+                if(m < c_m_size-1)
                     pybar.set_col(0, p*B0_1);
             }
 
             {
                 --bdata;
 
-                Vector<float,R> e = zeros<float,R>();
+                Vector<float,ORDER> e = zeros<float,ORDER>();
 
                 e[0] = *bdata--;
 
                 for(int j=WS-2; j>=0; --j, --bdata)
                 {
 #if CUDA_SM >= 20 || ORDER>1
-                    *bdata = rev(*bdata, e, c5_weights);
+                    *bdata = rev(*bdata, e, c_weights);
 #else
-                    *bdata = e[0] = rec_op(*bdata, e[0]*c5_weights[1]);
+                    *bdata = e[0] = rec_op(*bdata, e[0]*c_weights[1]);
 #endif
                 }
 
@@ -358,21 +396,21 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
         {
             float (*bdata)[WS+1] = (float (*)[WS+1]) &block[ty*WS][tx];
             {
-                Vector<float,R> p = zeros<float,R>();
+                Vector<float,ORDER> p = zeros<float,ORDER>();
 
-                p[R-1] = **bdata++;
+                p[ORDER-1] = **bdata++;
 
 #pragma unroll
                 for(int i=1; i<WS; ++i, ++bdata)
                 {
 #if CUDA_SM >= 20 || ORDER>1
-                    **bdata = fwd(p, **bdata, c5_weights);
+                    **bdata = fwd(p, **bdata, c_weights);
 #else
-                    **bdata = p[0] = rec_op(**bdata, p[0]*c5_weights[1]);
+                    **bdata = p[0] = rec_op(**bdata, p[0]*c_weights[1]);
 #endif
                 }
 
-                if(n < c5_n_size-1)
+                if(n < c_n_size-1)
                     ptucheck.set_col(0, p*B0_3);
             }
 
@@ -380,7 +418,7 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
             {
                 --bdata;
 
-                Vector<float,R> e = zeros<float,R>();
+                Vector<float,ORDER> e = zeros<float,ORDER>();
 
                 e[0] = **bdata--;
 
@@ -388,9 +426,9 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
                 for(int i=WS-2; i>=0; --i, --bdata)
                 {
 #if CUDA_SM >= 20 || ORDER>1
-                    rev(**bdata, e, c5_weights);
+                    rev(**bdata, e, c_weights);
 #else
-                    e[0] = rec_op(**bdata, e[0]*c5_weights[1]);
+                    e[0] = rec_op(**bdata, e[0]*c_weights[1]);
 #endif
                 }
 
@@ -418,26 +456,25 @@ void collect_carries(Matrix<float,R,WS> *g_pybar,
  *  @param[in,out] g_transp_ybar All $P_{m,n}(\bar{Y})$
  *  @param[in,out] g_transp_zhat All $E_{m,n}(\hat{Z})$
  */
-template <int R>
 __global__
 #if NB23
 __launch_bounds__(WS*W23, NB23)
 #endif
-void adjust_carries(Matrix<float,R,WS> *g_pybar, 
-                    Matrix<float,R,WS> *g_ezhat,
+void adjust_carries(Matrix<float,ORDER,WS> *g_pybar, 
+                    Matrix<float,ORDER,WS> *g_ezhat,
                     int m_size, int n_size)
 {
     int tx = threadIdx.x, ty = threadIdx.y, n = blockIdx.y;
 
-    __shared__ Matrix<float,R,WS> block[W23];
+    __shared__ Matrix<float,ORDER,WS> block[W23];
 
-    Matrix<float,R,WS> &bdata = (Matrix<float,R,WS> &)block[ty][0][tx];
+    Matrix<float,ORDER,WS> &bdata = (Matrix<float,ORDER,WS> &)block[ty][0][tx];
 
     // P(ybar) -> P(y) processing --------------------------------------
 
-    Matrix<float,R,WS> *pybar = (Matrix<float,R,WS> *)&g_pybar[n*m_size+ty][0][tx];
+    Matrix<float,ORDER,WS> *pybar = (Matrix<float,ORDER,WS> *)&g_pybar[n*m_size+ty][0][tx];
 
-    Vector<float,R> py = zeros<float,R>(); // P(Y)
+    Vector<float,ORDER> py = zeros<float,ORDER>(); // P(Y)
 
     int m = 0;
     if(blockDim.y == W23)
@@ -452,10 +489,10 @@ void adjust_carries(Matrix<float,R,WS> *g_pybar,
 
             if(ty == 0)
             {
-                Matrix<float,R,WS> *bdata = (Matrix<float,R,WS> *)&block[0][0][tx];
+                Matrix<float,ORDER,WS> *bdata = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
                 for(int dm=0; dm<W23; ++dm, ++bdata)
-                    py = mad(bdata[0], py, c5_AbF_T);
+                    py = mad(bdata[0], py, c_AbF_T);
             }
 
             __syncthreads();
@@ -479,10 +516,10 @@ void adjust_carries(Matrix<float,R,WS> *g_pybar,
 
         if(ty == 0)
         {
-            Matrix<float,R,WS> *bdata = (Matrix<float,R,WS> *)&block[0][0][tx];
+            Matrix<float,ORDER,WS> *bdata = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
             for(int dm=0; dm<remaining; ++dm, ++bdata)
-                py = mad(bdata[0], py, c5_AbF_T);
+                py = mad(bdata[0], py, c_AbF_T);
         }
 
         __syncthreads();
@@ -496,15 +533,15 @@ void adjust_carries(Matrix<float,R,WS> *g_pybar,
 
     m = m_size-1;
 
-    Matrix<float,R,WS> 
-        *pm1y  = (Matrix<float,R,WS> *)&g_pybar[n*m_size+m-ty-1][0][tx],
-        *ezhat = (Matrix<float,R,WS> *)&g_ezhat[n*m_size+m-ty][0][tx];
+    Matrix<float,ORDER,WS> 
+        *pm1y  = (Matrix<float,ORDER,WS> *)&g_pybar[n*m_size+m-ty-1][0][tx],
+        *ezhat = (Matrix<float,ORDER,WS> *)&g_ezhat[n*m_size+m-ty][0][tx];
 
 
     // all pybars must be updated!
     __syncthreads();
 
-    Vector<float,R> ez = zeros<float,R>();
+    Vector<float,ORDER> ez = zeros<float,ORDER>();
 
     m = m_size-1;
     if(blockDim.y == W23)
@@ -517,17 +554,17 @@ void adjust_carries(Matrix<float,R,WS> *g_pybar,
                 bdata.set_col(0, ezhat->col(0));
 
                 if(m-ty > 0)
-                    mad(bdata, *pm1y, c5_HARB_AFP_T);
+                    mad(bdata, *pm1y, c_HARB_AFP_T);
 
                 __syncthreads();
 
                 if(ty == 0)
                 {
-                    Matrix<float,R,WS> *bdata 
-                        = (Matrix<float,R,WS> *)&block[0][0][tx];
+                    Matrix<float,ORDER,WS> *bdata 
+                        = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
                     for(int dm=0; dm<W23; ++dm, ++bdata)
-                        ez = mad(bdata[0], ez, c5_AbR_T);
+                        ez = mad(bdata[0], ez, c_AbR_T);
                 }
 
                 __syncthreads();
@@ -549,17 +586,17 @@ void adjust_carries(Matrix<float,R,WS> *g_pybar,
         if(m-ty > 0)
         {
             bdata.set_col(0, ezhat->col(0));
-            mad(bdata, *pm1y, c5_HARB_AFP_T);
+            mad(bdata, *pm1y, c_HARB_AFP_T);
         }
 
         __syncthreads();
 
         if(ty == 0)
         {
-            Matrix<float,R,WS> *bdata = (Matrix<float,R,WS> *)&block[0][0][tx];
+            Matrix<float,ORDER,WS> *bdata = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
             for(int dm=1; dm<remaining; ++dm, ++bdata)
-                ez = mad(bdata[0], ez, c5_AbR_T);
+                ez = mad(bdata[0], ez, c_AbR_T);
         }
 
         __syncthreads();
@@ -587,21 +624,20 @@ void adjust_carries(Matrix<float,R,WS> *g_pybar,
  *  @param[in,out] g_transp_ybar All $P_{m,n}(\bar{Y})$
  *  @param[in,out] g_transp_zhat All $E_{m,n}(\hat{Z})$
  */
-template <int R>
 __global__
 #if NB45
 __launch_bounds__(WS*W45, NB45)
 #endif
-void adjust_carries(Matrix<float,R,WS> *g_ptucheck, 
-                    Matrix<float,R,WS> *g_etvtilde,
-                    Matrix<float,R,WS> *g_py, 
-                    Matrix<float,R,WS> *g_ez,
+void adjust_carries(Matrix<float,ORDER,WS> *g_ptucheck, 
+                    Matrix<float,ORDER,WS> *g_etvtilde,
+                    Matrix<float,ORDER,WS> *g_py, 
+                    Matrix<float,ORDER,WS> *g_ez,
 
                     int m_size, int n_size)
 {
     int tx = threadIdx.x, ty = threadIdx.y, m = blockIdx.x;
 
-    __shared__ Matrix<float,R,WS> block[W45];
+    __shared__ Matrix<float,ORDER,WS> block[W45];
 
 	volatile __shared__ float block_RD_raw[W45][WS/2+WS+1];
 	volatile float (*block_RD)[WS/2+WS+1] = 
@@ -609,16 +645,16 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
     if(ty < W45)
         block_RD_raw[ty][tx] = 0;
 
-    Matrix<float,R,WS> &bdata = (Matrix<float,R,WS> &)block[ty][0][tx];
+    Matrix<float,ORDER,WS> &bdata = (Matrix<float,ORDER,WS> &)block[ty][0][tx];
 
     // Pt(ucheck) -> Pt(u) processing --------------------------------------
 
-    Matrix<float,R,WS> 
-        *ptucheck = (Matrix<float,R,WS> *)&g_ptucheck[ty*c5_m_size+m][0][tx],
-        *pm1y = (Matrix<float,R,WS> *)&g_py[ty*c5_m_size+m-1][0][tx],
-        *em1z = (Matrix<float,R,WS> *)&g_ez[ty*c5_m_size+m+1][0][tx];
+    Matrix<float,ORDER,WS> 
+        *ptucheck = (Matrix<float,ORDER,WS> *)&g_ptucheck[ty*c_m_size+m][0][tx],
+        *pm1y = (Matrix<float,ORDER,WS> *)&g_py[ty*c_m_size+m-1][0][tx],
+        *em1z = (Matrix<float,ORDER,WS> *)&g_ez[ty*c_m_size+m+1][0][tx];
 
-    Vector<float,R> ptu = zeros<float,R>(); // Pt(U)
+    Vector<float,ORDER> ptu = zeros<float,ORDER>(); // Pt(U)
 
     int n = 0;
     if(blockDim.y == W45)
@@ -630,44 +666,44 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
             bdata.set_col(0, ptucheck->col(0));
 
             if(m > 0)
-                mad(bdata, c5_TAFB, *pm1y, c5_ARB_AFP_T, block_RD);
+                mad(bdata, c_TAFB, *pm1y, c_ARB_AFP_T, block_RD);
 
-            if(m < c5_m_size-1)
-                mad(bdata, c5_TAFB, *em1z, c5_ARE_T, block_RD);
+            if(m < c_m_size-1)
+                mad(bdata, c_TAFB, *em1z, c_ARE_T, block_RD);
 
             __syncthreads();
 
             if(ty == 0)
             {
-                Matrix<float,R,WS> *bdata = (Matrix<float,R,WS> *)&block[0][0][tx];
+                Matrix<float,ORDER,WS> *bdata = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
                 for(int dn=0; dn<W45; ++dn, ++bdata)
-                    ptu = mad(*bdata, c5_AbF, ptu);
+                    ptu = mad(*bdata, c_AbF, ptu);
             }
 
             __syncthreads();
 
             ptucheck->set_col(0,bdata.col(0));
 
-            ptucheck += W45*c5_m_size;
-            pm1y += W45*c5_m_size;
-            em1z += W45*c5_m_size;
+            ptucheck += W45*c_m_size;
+            pm1y += W45*c_m_size;
+            em1z += W45*c_m_size;
         }
     }
 
     // remaining column-blocks
 
-    if(n < c5_n_size-1)
+    if(n < c_n_size-1)
     {
-        if(n+ty < c5_n_size-1)
+        if(n+ty < c_n_size-1)
         {
             bdata.set_col(0, ptucheck->col(0));
 
-            if(m < c5_m_size-1)
-                mad(bdata, c5_TAFB, *em1z, c5_ARE_T, block_RD);
+            if(m < c_m_size-1)
+                mad(bdata, c_TAFB, *em1z, c_ARE_T, block_RD);
 
             if(m > 0)
-                mad(bdata, c5_TAFB, *pm1y, c5_ARB_AFP_T, block_RD);
+                mad(bdata, c_TAFB, *pm1y, c_ARB_AFP_T, block_RD);
         }
 
         int remaining = n_size-1 - n;
@@ -676,10 +712,10 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
 
         if(ty == 0)
         {
-            Matrix<float,R,WS> *bdata = (Matrix<float,R,WS> *)&block[0][0][tx];
+            Matrix<float,ORDER,WS> *bdata = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
             for(int dn=0; dn<remaining; ++dn, ++bdata)
-                ptu = mad(bdata[0], c5_AbF, ptu);
+                ptu = mad(bdata[0], c_AbF, ptu);
         }
 
         __syncthreads();
@@ -692,17 +728,17 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
 
     n = n_size-1;
 
-    Matrix<float,R,WS>
-        *etvtilde = (Matrix<float,R,WS> *)&g_etvtilde[(n-ty)*c5_m_size+m][0][tx],
-        *ptn1u = (Matrix<float,R,WS> *)&g_ptucheck[(n-ty-1)*c5_m_size+m][0][tx];
+    Matrix<float,ORDER,WS>
+        *etvtilde = (Matrix<float,ORDER,WS> *)&g_etvtilde[(n-ty)*c_m_size+m][0][tx],
+        *ptn1u = (Matrix<float,ORDER,WS> *)&g_ptucheck[(n-ty-1)*c_m_size+m][0][tx];
 
-    pm1y = (Matrix<float,R,WS> *)&g_py[(n-ty)*c5_m_size+m-1][0][tx];
-    em1z = (Matrix<float,R,WS> *)&g_ez[(n-ty)*c5_m_size+m+1][0][tx];
+    pm1y = (Matrix<float,ORDER,WS> *)&g_py[(n-ty)*c_m_size+m-1][0][tx];
+    em1z = (Matrix<float,ORDER,WS> *)&g_ez[(n-ty)*c_m_size+m+1][0][tx];
 
     // all pybars must be updated!
     __syncthreads();
 
-    Vector<float,R> etv = zeros<float,R>();
+    Vector<float,ORDER> etv = zeros<float,ORDER>();
 
     if(blockDim.y == W45)
     {
@@ -714,23 +750,23 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
                 bdata.set_col(0, etvtilde->col(0));
 
                 if(m > 0)
-                    mad(bdata, c5_HARB_AFB, *pm1y, c5_ARB_AFP_T, block_RD);
+                    mad(bdata, c_HARB_AFB, *pm1y, c_ARB_AFP_T, block_RD);
 
-                if(m < c5_m_size-1)
-                    mad(bdata, c5_HARB_AFB, *em1z, c5_ARE_T, block_RD);
+                if(m < c_m_size-1)
+                    mad(bdata, c_HARB_AFB, *em1z, c_ARE_T, block_RD);
 
                 if(n-ty > 0)
-                    mad(bdata, *ptn1u, c5_HARB_AFP_T);
+                    mad(bdata, *ptn1u, c_HARB_AFP_T);
 
                 __syncthreads();
 
                 if(ty == 0)
                 {
-                    Matrix<float,R,WS> *bdata 
-                        = (Matrix<float,R,WS> *)&block[0][0][tx];
+                    Matrix<float,ORDER,WS> *bdata 
+                        = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
                     for(int dn=0; dn<W45; ++dn, ++bdata)
-                        etv = mad(bdata[0], c5_AbR, etv);
+                        etv = mad(bdata[0], c_AbR, etv);
                 }
 
                 __syncthreads();
@@ -738,10 +774,10 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
                 etvtilde->set_col(0,bdata.col(0));
             }
 
-            etvtilde -= W45*c5_m_size;
-            pm1y -= W45*c5_m_size;
-            em1z -= W45*c5_m_size;
-            ptn1u -= W45*c5_m_size;
+            etvtilde -= W45*c_m_size;
+            pm1y -= W45*c_m_size;
+            em1z -= W45*c_m_size;
+            ptn1u -= W45*c_m_size;
         }
     }
 
@@ -756,22 +792,22 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
             bdata.set_col(0, etvtilde->col(0));
 
             if(m > 0)
-                mad(bdata, c5_HARB_AFB, *pm1y, c5_ARB_AFP_T, block_RD);
+                mad(bdata, c_HARB_AFB, *pm1y, c_ARB_AFP_T, block_RD);
 
-            if(m < c5_m_size-1)
-                mad(bdata, c5_HARB_AFB, *em1z, c5_ARE_T, block_RD);
+            if(m < c_m_size-1)
+                mad(bdata, c_HARB_AFB, *em1z, c_ARE_T, block_RD);
 
-            mad(bdata, *ptn1u, c5_HARB_AFP_T);
+            mad(bdata, *ptn1u, c_HARB_AFP_T);
         }
 
         __syncthreads();
 
         if(ty == 0)
         {
-            Matrix<float,R,WS> *bdata = (Matrix<float,R,WS> *)&block[0][0][tx];
+            Matrix<float,ORDER,WS> *bdata = (Matrix<float,ORDER,WS> *)&block[0][0][tx];
 #pragma unroll
             for(int dn=1; dn<remaining; ++dn, ++bdata)
-                etv = mad(bdata[0], c5_AbR, etv);
+                etv = mad(bdata[0], c_AbR, etv);
         }
 
         __syncthreads();
@@ -781,16 +817,15 @@ void adjust_carries(Matrix<float,R,WS> *g_ptucheck,
     }
 }
 
-template <int R>
 __global__
 #if NB6
 __launch_bounds__(WS*W6, NB6)
 #endif
 void write_result(float *g_out,
-                  const Matrix<float,R,WS> *g_py, 
-                  const Matrix<float,R,WS> *g_ez,
-                  const Matrix<float,R,WS> *g_ptu, 
-                  const Matrix<float,R,WS> *g_etv)
+                  const Matrix<float,ORDER,WS> *g_py, 
+                  const Matrix<float,ORDER,WS> *g_ez,
+                  const Matrix<float,ORDER,WS> *g_ptu, 
+                  const Matrix<float,ORDER,WS> *g_etv)
 {
     int tx = threadIdx.x, ty = threadIdx.y, 
 #if CUDA_SM >= 20
@@ -809,11 +844,11 @@ void write_result(float *g_out,
 #endif
 
     // load data into shared memory
-    read_block<W6>(block, m, n, c5_inv_with, c5_inv_height);
+    read_block<W6>(block, m, n, c_inv_width, c_inv_height);
 
 #if CUDA_SM >= 20
     m += ty;
-    if(m >= c5_m_size)
+    if(m >= c_m_size)
         return;
 #endif
 
@@ -826,12 +861,12 @@ void write_result(float *g_out,
 #endif
     {
 
-        Matrix<float,R,WS> 
-            &py = (Matrix<float,R,WS>&)  g_py[n*c5_m_size+m-1][0][tx],
-            &ez = (Matrix<float,R,WS>&)  g_ez[n*c5_m_size+m+1][0][tx],
-            &ptu = (Matrix<float,R,WS>&) g_ptu[(n-1)*c5_m_size+m][0][tx],
-            &etv = (Matrix<float,R,WS>&) g_etv[(n+1)*c5_m_size+m][0][tx];
-        const float B0_2 = c5_weights[0]*c5_weights[0];
+        Matrix<float,ORDER,WS> 
+            &py = (Matrix<float,ORDER,WS>&)  g_py[n*c_m_size+m-1][0][tx],
+            &ez = (Matrix<float,ORDER,WS>&)  g_ez[n*c_m_size+m+1][0][tx],
+            &ptu = (Matrix<float,ORDER,WS>&) g_ptu[(n-1)*c_m_size+m][0][tx],
+            &etv = (Matrix<float,ORDER,WS>&) g_etv[(n+1)*c_m_size+m][0][tx];
+        const float B0_2 = c_weights[0]*c_weights[0];
 
         {
 
@@ -839,35 +874,35 @@ void write_result(float *g_out,
             float *bdata = block[tx+ty*WS];
 
             // calculate pybar, scan left -> right
-            Vector<float,R> p = m==0 ? zeros<float,R>()
-                                     : py.col(0) / c5_weights[0];
+            Vector<float,ORDER> p = m==0 ? zeros<float,ORDER>()
+                                     : py.col(0) / c_weights[0];
 
 #pragma unroll
             for(int j=0; j<WS; ++j, ++bdata)
-                *bdata = fwd(p, *bdata, c5_weights);
+                *bdata = fwd(p, *bdata, c_weights);
 
             --bdata;
 
-            Vector<float,R> e = m==c5_m_size-1 ? zeros<float,R>()
+            Vector<float,ORDER> e = m==c_m_size-1 ? zeros<float,ORDER>()
                                               : ez.col(0);
 
 #pragma unroll
             for(int j=WS-1; j>=0; --j, --bdata)
-                *bdata = rev(*bdata*B0_2, e, c5_weights);
+                *bdata = rev(*bdata*B0_2, e, c_weights);
         }
         {
             float (*bdata)[WS+1] = (float (*)[WS+1]) &block[ty*WS][tx];
 
-            Vector<float,R> p = n==0 ? zeros<float,R>()
-                                     : ptu.col(0) / c5_weights[0];
+            Vector<float,ORDER> p = n==0 ? zeros<float,ORDER>()
+                                     : ptu.col(0) / c_weights[0];
 
 #pragma unroll
             for(int i=0; i<WS; ++i, ++bdata)
-                **bdata = fwd(p, **bdata, c5_weights);
+                **bdata = fwd(p, **bdata, c_weights);
 
             --bdata;
 
-            Vector<float,R> e = n==c5_n_size-1 ? zeros<float,R>()
+            Vector<float,ORDER> e = n==c_n_size-1 ? zeros<float,ORDER>()
                                               : etv.col(0);
 
             // for some reason it's faster when this is here then inside the
@@ -876,44 +911,44 @@ void write_result(float *g_out,
             int y = (n-c_border+1)*WS-1;
 
             // current block intersects transp_out's area?
-            if(m >= c_border && m <= c5_last_m && n >= c_border && n <= c5_last_n)
+            if(m >= c_border && m <= c_last_m && n >= c_border && n <= c_last_n)
             {
                 // image's end is in the middle of the block and we're outside
                 // the image width?
-                if(y >= c5_height)
+                if(y >= c_height)
                 {
                     // process data until we get into the image
                     int i;
 #pragma unroll
-                    for(i=y; i>=c5_height; --i, --bdata)
-                        rev(**bdata*B0_2, e, c5_weights);
+                    for(i=y; i>=c_height; --i, --bdata)
+                        rev(**bdata*B0_2, e, c_weights);
 
-//                    bdata -= y-c5_height+1;
+//                    bdata -= y-c_height+1;
 
                     // now we're inside the image, we must write to transp_out
-                    float *out = g_out + (c5_height-1)*c5_rowstride + x;
+                    float *out = g_out + (c_height-1)*c_rowstride + x;
 
                     int nmin = y-(WS-1);
 
 #pragma unroll
-                    for(;i>=nmin; --i, --bdata, out -= c5_rowstride)
+                    for(;i>=nmin; --i, --bdata, out -= c_rowstride)
                     {
-                        rev(**bdata*B0_2, e, c5_weights);
+                        rev(**bdata*B0_2, e, c_weights);
 
-                        if(x < c5_width)
+                        if(x < c_width)
                             *out = e[0];
                     }
                 }
                 else
                 {
-                    float *out = g_out + y*c5_rowstride + x;
+                    float *out = g_out + y*c_rowstride + x;
 
 #pragma unroll
-                    for(int i=WS-1; i>=0; --i, --bdata, out -= c5_rowstride)
+                    for(int i=WS-1; i>=0; --i, --bdata, out -= c_rowstride)
                     {
-                        rev(**bdata*B0_2, e, c5_weights);
+                        rev(**bdata*B0_2, e, c_weights);
 
-                        if(x < c5_width)
+                        if(x < c_width)
                             *out = e[0];
                     }
                 }
@@ -921,198 +956,4 @@ void write_result(float *g_out,
         }
     }
 }
-
-struct recfilter5_plan_type
-{
-    dvector<Matrix<float,ORDER,WS> > d_pybar,
-                                 d_ezhat,
-                                 d_ptucheck,
-                                 d_etvtilde;
-    int width, height;
-    int rowstride;
-    float inv_width, inv_height;
-    int m_size, n_size;
-    BorderType border_type;
-
-    cudaArray *a_in;
-} *plan = NULL;
-
-/**
- *  @brief Recursive Filtering Algorithm 4 for filter order 2
- *
- *  This function computes the algorithm 4_2.
- *
- *  @param[in] h_img Input image
- *  @param[in] width Image width
- *  @param[in] height Image height
- *  @param[in] a0 Feedback coefficient
- *  @param[in] b1 Feedforward coefficient
- */
-__host__
-void recursive_filter_5(float *d_output, const float *d_input)
-{
-    cudaMemcpy2DToArray(plan->a_in, 0, 0, d_input, plan->rowstride*sizeof(float),
-                        plan->width*sizeof(float), plan->height,
-                      cudaMemcpyDeviceToDevice);
-
-    cudaBindTextureToArray(t_in, plan->a_in);
-
-    collect_carries<<< 
-#if CUDA_SM >= 20
-            dim3((plan->m_size+2-1)/2, plan->n_size), 
-#else
-            dim3(plan->m_size, plan->n_size), 
-#endif
-        dim3(WS, W1) >>>
-        (&plan->d_pybar, &plan->d_ezhat, &plan->d_ptucheck, &plan->d_etvtilde);
-
-    adjust_carries<<< dim3(1,plan->n_size), 
-                     dim3(WS, std::min<int>(plan->m_size, W23)) >>>
-        (&plan->d_pybar, &plan->d_ezhat, plan->m_size, plan->n_size );
-
-    adjust_carries<<< dim3(plan->m_size,1), 
-                     dim3(WS, std::min<int>(plan->n_size, W45)) >>>
-        (&plan->d_ptucheck, &plan->d_etvtilde, &plan->d_pybar, &plan->d_ezhat, 
-         plan->m_size, plan->n_size );
-
-    write_result<<< 
-#if CUDA_SM >= 20
-            dim3((plan->m_size+2-1)/2,plan->n_size), 
-#else
-            dim3(plan->m_size,plan->n_size), 
-#endif
-                     dim3(WS, W6)>>>
-        (d_output, &plan->d_pybar, &plan->d_ezhat, 
-         &plan->d_ptucheck, &plan->d_etvtilde);
-
-    cudaUnbindTexture(t_in);
-
-}
-
-void recursive_filter_5(float *d_inout)
-{
-    recursive_filter_5(d_inout, d_inout);
-}
-
-void recursive_filter_5_setup(int width, int height, int rowstride,
-                              const Vector<float, ORDER+1> &w, 
-                              BorderType border_type, int border)
-{
-    const int R = ORDER;
-    const int B = 32;
-
-    Matrix<float,R,R> Ir = identity<float,R,R>();
-    Matrix<float,B,R> Zbr = zeros<float,B,R>();
-    Matrix<float,R,B> Zrb = zeros<float,R,B>();
-    Matrix<float,B,B> Ib = identity<float,B,B>();
-
-    Matrix<float,R,B> AFP_T = fwd(Ir, Zrb, w),
-                      ARE_T = rev(Zrb, Ir, w);
-    Matrix<float,B,B> AFB_T = fwd(Zbr, Ib, w),
-                      ARB_T = rev(Ib, Zbr, w);
-
-    Matrix<float,R,R> AbF_T = tail<R>(AFP_T),
-                      AbR_T = head<R>(ARE_T),
-                      AbF = transp(AbF_T),
-                      AbR = transp(AbR_T),
-                      HARB_AFP_T = AFP_T*head<R>(ARB_T),
-                      HARB_AFP = transp(HARB_AFP_T);
-    Matrix<float,R,B> ARB_AFP_T = AFP_T*ARB_T,
-                      TAFB = transp(tail<R>(AFB_T)),
-                      HARB_AFB = transp(AFB_T*head<R>(ARB_T));
-
-
-    int bleft, bright, btop, bbottom;
-    calc_borders(&bleft, &btop, &bright, &bbottom, width, height, border);
-
-    const int m_size = (width+bleft+bright+WS-1)/WS,
-              n_size = (height+btop+bbottom+WS-1)/WS;
-
-    int last_m = (bleft+width-1)/WS,
-        last_n = (btop+height-1)/WS;
-    float inv_width = 1.f/width, inv_height = 1.f/height;
-
-    copy_to_symbol("c5_weights", w);
-
-    copy_to_symbol("c5_AbF_T", AbF_T);
-    copy_to_symbol("c5_AbR_T", AbR_T);
-    copy_to_symbol("c5_HARB_AFP_T", HARB_AFP_T);
-
-    copy_to_symbol("c5_AbF", AbF);
-    copy_to_symbol("c5_AbR", AbR);
-    copy_to_symbol("c5_HARB_AFP", HARB_AFP);
-
-    copy_to_symbol("c5_ARE_T", ARE_T);
-    copy_to_symbol("c5_ARB_AFP_T", ARB_AFP_T);
-    copy_to_symbol("c5_TAFB", TAFB);
-    copy_to_symbol("c5_HARB_AFB", HARB_AFB);
-
-    copy_to_symbol("c_border",border);
-    copy_to_symbol("c5_inv_with", inv_width); 
-    copy_to_symbol("c5_inv_height", inv_height);
-    copy_to_symbol("c5_width", width); 
-    copy_to_symbol("c5_height", height);
-    copy_to_symbol("c5_m_size", m_size); 
-    copy_to_symbol("c5_n_size", n_size);
-    copy_to_symbol("c5_last_m", last_m); 
-    copy_to_symbol("c5_last_n", last_n);
-    copy_to_symbol("c5_rowstride", rowstride);
-
-    t_in.normalized = true;
-    t_in.filterMode = cudaFilterModePoint;
-
-    switch(border_type)
-    {
-    case CLAMP_TO_ZERO:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeBorder;
-        break;
-    case CLAMP_TO_EDGE:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeClamp;
-        break;
-    case REPEAT:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeWrap;
-        break;
-    case REFLECT:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeMirror;
-        break;
-    }
-
-    if(plan != NULL)
-        recursive_filter_5_free();
-
-    plan = new recfilter5_plan_type();
-
-
-    cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float>();
-    cudaMallocArray(&plan->a_in, &ccd, width, height);
-
-    t_in.normalized = true;
-    t_in.filterMode = cudaFilterModePoint;
-
-    plan->rowstride = rowstride;
-
-    plan->d_pybar.resize(n_size*m_size);
-    plan->d_ezhat.resize(n_size*m_size);
-    plan->d_ptucheck.resize(n_size*m_size);
-    plan->d_etvtilde.resize(n_size*m_size);
-    plan->border_type = border_type;
-
-    plan->width = width;
-    plan->height = height;
-    plan->inv_width = inv_width;
-    plan->inv_height = inv_height;
-    plan->m_size = m_size;
-    plan->n_size = n_size;
-}
-
-void recursive_filter_5_free()
-{
-    if(plan)
-    {
-        cudaFreeArray(plan->a_in);
-        delete plan;
-        plan = NULL;
-    }
-}
-
 
