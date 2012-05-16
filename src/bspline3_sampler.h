@@ -43,8 +43,6 @@ public:
     typedef S sampler_type;
     typedef typename S::result_type result_type;
 
-    // accepts texture in gamma space
-    // returns result in linear space
     __device__ inline 
     result_type operator()(float2 pos, int kx=0, int ky=0) const
     {
@@ -213,7 +211,7 @@ public:
         }
 #endif
 
-        return srgb2lrgb(value);
+        return value;
     }
 };
 
