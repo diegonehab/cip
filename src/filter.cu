@@ -142,7 +142,8 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
 
     for(int s=0; s<SAMPDIM; ++s)
     {
-        pixel_type value = srgb2lrgb(do_filter<OP>(sampler, p+blue_noise[s]));
+        pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
+        value = srgb2lrgb(value);
 
         // scans through the kernel support, collecting data for each position
 #pragma unroll
