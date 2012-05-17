@@ -50,8 +50,6 @@ public:
 
         pos -= 0.5f;
 
-        result_type value;
-
 #if USE_FAST_CUBIC_INTERPOLATION
         if(kx < 2 && ky < 2)
         {
@@ -88,9 +86,9 @@ public:
             }
 
             if(kx == 0)
-                value = lerp(tex10, tex00, g0.x);
+                return lerp(tex10, tex00, g0.x);
             else
-                value = (tex00 - tex10)*g0.x;
+                return (tex00 - tex10)*g0.x;
         }
         else if(kx == 2 && ky < 2)
         {
@@ -132,7 +130,7 @@ public:
             }
 
             // weigh along the x-direction
-            value = tex00-2*tex10+tex20;
+            return tex00-2*tex10+tex20;
         }
         else if(ky == 2 && kx < 2)
         {
@@ -165,9 +163,9 @@ public:
 
             // weigh along the x-direction
             if(kx == 0)
-                value = lerp(tex10, tex00, g0);
+                return lerp(tex10, tex00, g0);
             else
-                value = (tex10 - tex00)*g0;
+                return (tex10 - tex00)*g0;
         }
         else
         {
@@ -189,7 +187,7 @@ public:
             tex20 = tex20-2*tex21+tex22;
 
             // weigh along the x-direction
-            value = tex00-2*tex10+tex20;
+            return tex00-2*tex10+tex20;
         }
 #else
         float2 index = floor(pos);
@@ -200,18 +198,18 @@ public:
         bspline3_weights(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
         bspline3_weights(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
 
-        value = cuda_traits<result_type>::make(0);
+        result_type value =  cuda_traits<result_type>::make(0);
 
 #pragma unroll
+
         for(int i=0; i<4; ++i)
         {
 #pragma unroll
             for(int j=0; j<4; ++j)
                 value += sampler(index.x+0.5f+j-1,index.y+0.5f+i-1)*w[i].y*w[j].x;
         }
-#endif
-
         return value;
+#endif
     }
 };
 
