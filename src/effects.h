@@ -14,7 +14,10 @@ float lrgb2srgb(float v)
     if(v <= 0.0031308f)
         return 12.92f*v;
     else
-        return (1.f+a)*powf(v,1.f/2.4f)-a;
+        //return (1.f+a)*powf(v,1.f/2.4f)-a;
+//        return powf(v,1/2.2f); // faster approximation
+        return sqrtf(v); // even faster
+
 }
 
 __device__ inline 
@@ -32,7 +35,9 @@ float srgb2lrgb(float v)
     if(v <= 0.04045f)
         return v/12.92f;
     else
-        return powf((v+a)/(1.f+a),2.4f);
+ //       return powf((v+a)/(1.f+a),2.4f);
+//        return powf(v,2.2f); // faster approximation
+        return v*v; // even faster
 }
 
 __device__ inline 
