@@ -196,6 +196,7 @@ void thread::join()
             throw std::runtime_error(pimpl->error);
 
         pimpl->is_joined = true;
+        m_started = false;
     }
 }
 
