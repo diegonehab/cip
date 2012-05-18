@@ -89,6 +89,71 @@ struct sum_traits
     typedef typename pixel_traits<float,C+1>::pixel_type type;
 };
 
+void init_blue_noise()/*{{{*/
+{
+    std::vector<float2> blue_noise;
+    std::vector<float> bspline3_data;
+    blue_noise.reserve(SAMPDIM);
+    bspline3_data.reserve(SAMPDIM*KS*KS);
+    for(int i=0; i<SAMPDIM; ++i)
+    {
+        float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
+
+        blue_noise.push_back(n);
+        for(int y=0; y<KS; ++y)
+        {
+            for(int x=0; x<KS; ++x)
+            {
+                bspline3_data.push_back(bspline3(x+n.x-1.5)*
+                                        bspline3(y+n.y-1.5)/SAMPDIM);
+            }
+        }
+    }
+    copy_to_symbol("blue_noise",blue_noise);
+    copy_to_symbol("bspline3_data",bspline3_data);
+}/*}}}*/
+
+template<int C> 
+void init_filter(dimage_ptr<const float,C> img, const filter_operation &op)/*{{{*/
+{
+    typedef filter_traits<C> cfg;
+    typedef typename pixel_traits<float,C>::texel_type texel_type;
+    typedef typename sum_traits<C>::type sum_type;
+
+    if(cfg::a_in != NULL)
+    {
+        cudaFreeArray(cfg::a_in);
+        cfg::a_in = NULL;
+    }
+
+    // copy the input data to a texture
+    cudaChannelFormatDesc ccd = cudaCreateChannelDesc<texel_type>();
+
+    cudaMallocArray(&cfg::a_in, &ccd, img.width(), img.height());
+
+    cfg::copy_to_array(cfg::a_in, img);
+
+    cfg::tex().normalized = false;
+    cfg::tex().filterMode = cudaFilterModeLinear;
+
+    cfg::tex().addressMode[0] = cfg::tex().addressMode[1] = cudaAddressModeClamp;
+
+    copy_to_symbol("filter_op",op);
+
+    cfg::temp_image.resize(img.width(), img.height());
+
+    init_blue_noise();
+}/*}}}*/
+
+template<int C> 
+void destroy_filter()
+{
+    typedef filter_traits<C> cfg;
+
+    cfg::temp_image.reset();
+    cudaFreeArray(cfg::a_in);
+    cfg::a_in = NULL;
+}
 
 template <effect_type OP,int C>
 __global__
@@ -220,36 +285,20 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
 template <int C>
 void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
 {
-    typedef filter_traits<C> cfg;
-    typedef typename pixel_traits<float,C>::texel_type texel_type;
-    typedef typename sum_traits<C>::type sum_type;
-
-    // copy the input data to a texture
-    cudaArray *a_in;
-    cudaChannelFormatDesc ccd 
-        = cudaCreateChannelDesc<texel_type>();
-
-    cudaMallocArray(&a_in, &ccd, img.width(), img.height());
-
-    cfg::copy_to_array(a_in, img);
-
-    cfg::tex().normalized = false;
-    cfg::tex().filterMode = cudaFilterModeLinear;
-
-    cfg::tex().addressMode[0]= cfg::tex().addressMode[1] = cudaAddressModeClamp;
-
-    cudaBindTextureToArray(cfg::tex(), a_in);
-
     copy_to_symbol("filter_op",op);
 
-    dimage<sum_type, KS*KS> temp(img.width(), img.height());
+    typedef filter_traits<C> cfg;
+    assert(cfg::temp_image.width() == img.width() &&
+           cfg::temp_image.height() == img.height());
+
+    cudaBindTextureToArray(cfg::tex(), cfg::a_in);
 
     dim3 bdim(BW_F1,BH_F1),
          gdim((img.width()+bdim.x-1)/bdim.x, (img.height()+bdim.y-1)/bdim.y);
 
 #define CASE(EFFECT) \
     case EFFECT:\
-        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&temp); \
+        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&cfg::temp_image); \
         break
 
     switch(op.type)
@@ -275,13 +324,11 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
     {
         dim3 bdim(BW_F2,BH_F2),
              gdim((img.width()+bdim.x-1)/bdim.x,(img.height()+bdim.y-1)/bdim.y);
-        filter_kernel2<C><<<gdim, bdim>>>(img, &temp);
+        filter_kernel2<C><<<gdim, bdim>>>(img, &cfg::temp_image);
     }
 
     cudaUnbindTexture(cfg::tex());
-    cudaFreeArray(a_in);
 }/*}}}*/
-
 
 // Grayscale filtering ===================================================/*{{{*/
 
@@ -303,20 +350,18 @@ struct filter_traits<1>
     typedef texfetch_gray texfetch_type;
     static const int smem_size = 3;
 
+    static dimage<sum_traits<1>::type,KS*KS> temp_image;
+    static cudaArray *a_in;
+
     static 
     texture<float,2,cudaReadModeElementType> &tex() { return t_in_gray; }
 
-    static void copy_to_array(cudaArray *out, dimage_ptr<float> in)
+    static void copy_to_array(cudaArray *out, dimage_ptr<const float> in)
     {
         cudaMemcpy2DToArray(out, 0, 0, in, 
                             in.rowstride()*sizeof(float),
                             in.width()*sizeof(float), in.height(),
                             cudaMemcpyDeviceToDevice);
-    }
-
-    __device__ static float sample(float x, float y)
-    {
-        return tex2D(t_in_gray, x, y);
     }
 
     __device__ static float normalize_sum(float2 sum)
@@ -325,8 +370,16 @@ struct filter_traits<1>
     }
 };
 
+dimage<sum_traits<1>::type,KS*KS> filter_traits<1>::temp_image;
+cudaArray *filter_traits<1>::a_in = NULL;
+
 template 
 void filter(dimage_ptr<float,1> img, const filter_operation &op);
+
+template 
+void init_filter(dimage_ptr<const float,1> img, const filter_operation &op);
+
+template void destroy_filter<1>();
 /*}}}*/
 
 //{{{ RGB filtering =========================================================
@@ -357,7 +410,11 @@ struct filter_traits<3>
     static texture<float4,2,cudaReadModeElementType> &tex() 
         { return t_in_rgba; }
 
-    static void copy_to_array(cudaArray *out, dimage_ptr<float,3> img)
+    static cudaArray *a_in;
+
+    static dimage<sum_traits<3>::type,KS*KS> temp_image;
+
+    static void copy_to_array(cudaArray *out, dimage_ptr<const float,3> img)
     {
         dimage<float3> temp;
         temp.resize(img.width(), img.height());
@@ -375,30 +432,14 @@ struct filter_traits<3>
     }
 };
 
+dimage<sum_traits<3>::type,KS*KS> filter_traits<3>::temp_image;
+cudaArray *filter_traits<3>::a_in = NULL;
+
 template 
 void filter(dimage_ptr<float,3> img, const filter_operation &op);
+
+template 
+void init_filter(dimage_ptr<const float,3> img, const filter_operation &op);
+
+template void destroy_filter<3>();
 /*}}}*/
-
-void init_blue_noise()
-{
-    std::vector<float2> blue_noise;
-    std::vector<float> bspline3_data;
-    blue_noise.reserve(SAMPDIM);
-    bspline3_data.reserve(SAMPDIM*KS*KS);
-    for(int i=0; i<SAMPDIM; ++i)
-    {
-        float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
-
-        blue_noise.push_back(n);
-        for(int y=0; y<KS; ++y)
-        {
-            for(int x=0; x<KS; ++x)
-            {
-                bspline3_data.push_back(bspline3(x+n.x-1.5)*
-                                        bspline3(y+n.y-1.5)/SAMPDIM);
-            }
-        }
-    }
-    copy_to_symbol("blue_noise",blue_noise);
-    copy_to_symbol("bspline3_data",bspline3_data);
-}

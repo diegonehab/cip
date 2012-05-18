@@ -87,6 +87,11 @@ struct filter_operation
     };
 };
 
+template <int C> // C = number of channels
+void init_filter(dimage_ptr<const float,C> src_img, const filter_operation &op);
+
+template <int C> // C = number of channels
+void destroy_filter();
 
 template <int C> // C = number of channels
 void filter(dimage_ptr<float, C> img, const filter_operation &op);

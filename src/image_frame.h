@@ -5,8 +5,6 @@
 #include "nlfilter_gui.h"
 #include "dimage.h"
 
-template <class T> class dvector;
-
 class ImageFrame : public Fl_Gl_Window
 {
 public:

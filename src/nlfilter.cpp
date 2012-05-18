@@ -31,6 +31,8 @@ public:
     void on_undo_effect();
     void on_change_grayscale(bool gs);
 
+    static void on_postfilter_changed(Fl_Widget *,MainFrame *frame);
+
     static void on_param_changed(Fl_Widget *,MainFrame *frame)
     {
         // update the image to reflect the parameter change
@@ -114,17 +116,16 @@ MainFrame::MainFrame()
     m_effects->add("Hue, saturation and lightness",0,NULL,(void*)EFFECT_HUE_SATURATION_LIGHTNESS);
     m_effects->value(0);
 
-    Fl_Callback *on_param_changed = (Fl_Callback *)&MainFrame::on_param_changed;
-
     m_pre_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
     m_pre_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
     m_pre_filter->value(1);
-    m_pre_filter->callback(on_param_changed, this);
+    m_pre_filter->callback((Fl_Callback *)&MainFrame::on_param_changed, this);
 
     m_post_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
     m_post_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
     m_post_filter->value(1);
-    m_post_filter->callback(on_param_changed, this);
+    m_post_filter->callback((Fl_Callback *)&MainFrame::on_postfilter_changed, 
+                             this);
 }
 
 MainFrame::~MainFrame()
@@ -190,31 +191,6 @@ filter_operation MainFrame::get_filter_operation() const
 // setup recursive filters and other stuff
 void setup_recursive_filter(int width, int height, int rowstride)
 {
-    static bool init_noise = false;
-    static int cur_width=-1, cur_height=-1, cur_rowstride=-1;
-    static Vector<float,1+1> weights;
-
-    if(!init_noise)
-    {
-        // calculate cubic b-spline weights
-        float a = 2.f-std::sqrt(3.0f);
-
-        weights[0] = 1+a;
-        weights[1] = a;
-
-        init_blue_noise();
-        init_noise = true;
-    }
-
-    if(cur_width != width || cur_height!=height || cur_rowstride!=rowstride)
-    {
-        recursive_filter_5_setup<1>(width,height,rowstride,
-                                    weights, CLAMP_TO_EDGE, 1);
-
-        cur_width = width;
-        cur_height = height;
-        cur_rowstride = rowstride;
-    }
 }
 
 void MainFrame::start_render_thread()
@@ -253,7 +229,16 @@ void init_filter(dimage_ptr<T,C> out,
 
     int imgsize = in.width()*in.height();
 
-    setup_recursive_filter(in.width(), in.height(), in.rowstride());
+    Vector<float,1+1> weights;
+
+    // calculate cubic b-spline weights
+    float a = 2.f-std::sqrt(3.0f);
+
+    weights[0] = 1+a;
+    weights[1] = a;
+
+    recursive_filter_5_setup<1>(in.width(),in.height(),in.rowstride(),
+                                weights, CLAMP_TO_EDGE, 1);
 
     if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
     {
@@ -263,6 +248,8 @@ void init_filter(dimage_ptr<T,C> out,
     }
     else
         out = in;
+
+    init_filter(dimage_ptr<const T,C>(out), op);
 }
 
 template <class T, class U, int C>
@@ -277,11 +264,11 @@ void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
 
     base_timer *timerzao = NULL, *timer = NULL;
     if(flags & VERBOSE)
-        timerzao = &timers.cpu_add("Filter",imgsize,"P");
+        timerzao = &timers.gpu_add("Filter",imgsize,"P");
 
     // do actual filtering
     if(flags & VERBOSE)
-        timer = &timers.cpu_add("supersampling and transform",imgsize,"P");
+        timer = &timers.gpu_add("supersampling and transform",imgsize,"P");
 
     out = in;
 
@@ -294,7 +281,7 @@ void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
     {
         // convolve with a bpsline3^-1 to make a cardinal pre-filter
         if(flags & VERBOSE)
-            timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
+            timer = &timers.gpu_add("bspline3^-1 convolution",imgsize,"P");
 
         for(int i=0; i<C; ++i)
             recursive_filter_5(out[i]);
@@ -305,7 +292,7 @@ void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
 
     // maps back to gamma space
     if(flags & VERBOSE)
-        timer = &timers.cpu_add("linear to gamma",imgsize,"P");
+        timer = &timers.gpu_add("linear to gamma",imgsize,"P");
     lrgb2srgb(out, out);
     if(flags & VERBOSE)
         timer->stop();
@@ -381,7 +368,7 @@ void *MainFrame::render_thread(MainFrame *frame)
 
                 filter_operation op = frame->get_filter_operation();
 
-                cpu_timer timer;
+                gpu_timer timer;
 
                 // just process one (grayscale) channel?
                 if(frame->m_grayscale->value())
@@ -436,6 +423,10 @@ void *MainFrame::render_thread(MainFrame *frame)
     {
         Fl::awake((Fl_Awake_Handler)&show_error, new std::string("Render thread error: unknown"));
     }
+
+    destroy_filter<1>();
+    destroy_filter<3>();
+    recursive_filter_5_free();
 }
 
 void MainFrame::on_change_grayscale(bool gs)
@@ -449,6 +440,11 @@ void MainFrame::on_change_grayscale(bool gs)
     update_image();
 }
 
+void MainFrame::on_postfilter_changed(Fl_Widget *,MainFrame *frame)
+{
+    // must reprocess input image with new postfilter
+    frame->restart_render_thread();
+}
 
 void MainFrame::open(const std::string &fname)
 {
@@ -861,6 +857,8 @@ int main(int argc, char *argv[])
 
                 call_filter(&d_gray, &d_gray, op, VERBOSE);
 
+                destroy_filter<1>();
+
                 convert(&d_img, &d_gray);
             }
             else
@@ -873,6 +871,8 @@ int main(int argc, char *argv[])
                 init_filter(&d_channels, &d_channels, op);
 
                 call_filter(&d_channels, &d_channels, op, VERBOSE);
+
+                destroy_filter<3>();
 
                 convert(&d_img, &d_channels);
             }
