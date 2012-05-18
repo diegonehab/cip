@@ -19,7 +19,7 @@ const int BW_F2 = 32,
 
 #if USE_LAUNCH_BOUNDS
 const int 
-#if SAMPDIM == 8
+#if SAMPDIM == 8 && CUDA_SM >= 20
           NB_F1 = 2,  // number of blocks resident per SM
 #else
           NB_F1 = 1,  // number of blocks resident per SM
@@ -331,15 +331,6 @@ void filter(dimage_ptr<float,1> img, const filter_operation &op);
 
 //{{{ RGB filtering =========================================================
 
-#if CUDA_SM < 20
-template<> 
-void filter(dimage_ptr<float,3> img, const filter_operation &op)
-{
-    for(int i=0; i<3; ++i)
-        filter(img[i], op);
-}
-#else
-
 texture<float4, 2, cudaReadModeElementType> t_in_rgba;
 
 struct texfetch_rgba
@@ -356,7 +347,12 @@ template <>
 struct filter_traits<3>
 {
     typedef texfetch_rgba texfetch_type;
+
+#if CUDA_SM >= 20
     static const int smem_size = 5;
+#else
+    static const int smem_size = 3;
+#endif
 
     static texture<float4,2,cudaReadModeElementType> &tex() 
         { return t_in_rgba; }
@@ -381,8 +377,6 @@ struct filter_traits<3>
 
 template 
 void filter(dimage_ptr<float,3> img, const filter_operation &op);
-
-#endif
 /*}}}*/
 
 void init_blue_noise()
