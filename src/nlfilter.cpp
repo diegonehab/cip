@@ -244,13 +244,34 @@ enum filter_flags
 };
 
 template <class T, class U, int C>
-void call_filter(dimage_ptr<T,C> out, 
+void init_filter(dimage_ptr<T,C> out,
                  dimage_ptr<U,C> in,
-                 const filter_operation &op,
-                 int flags=0)
+                 const filter_operation &op)
 {
     assert(!in.empty());
     assert(!out.empty());
+
+    int imgsize = in.width()*in.height();
+
+    setup_recursive_filter(in.width(), in.height(), in.rowstride());
+
+    if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        // convolve with a bpsline3^-1 to make a cardinal post-filter
+        for(int i=0; i<C; ++i)
+            recursive_filter_5(out[i], in[i]);
+    }
+    else
+        out = in;
+}
+
+template <class T, class U, int C>
+void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
+                 const filter_operation &op,
+                 int flags=0)
+{
+    assert(!out.empty());
+    assert(!in.empty());
 
     int imgsize = in.width()*in.height();
 
@@ -258,24 +279,12 @@ void call_filter(dimage_ptr<T,C> out,
     if(flags & VERBOSE)
         timerzao = &timers.cpu_add("Filter",imgsize,"P");
 
-    if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
-    {
-        // convolve with a bpsline3^-1 to make a cardinal post-filter
-        if(flags & VERBOSE)
-            timer = &timers.cpu_add("bspline3^-1 convolution",imgsize,"P");
-
-        for(int i=0; i<C; ++i)
-            recursive_filter_5(out[i], in[i]);
-
-        if(timer)
-            timer->stop();
-    }
-    else
-        out = in;
-
     // do actual filtering
     if(flags & VERBOSE)
         timer = &timers.cpu_add("supersampling and transform",imgsize,"P");
+
+    out = in;
+
     filter(out, op);
 
     if(timer)
@@ -314,11 +323,31 @@ std::string unit_value(double v, double base);
 
 void *MainFrame::render_thread(MainFrame *frame)
 {
+    ImageFrame *imgframe = frame->m_image_frame;
+
+    filter_operation op = frame->get_filter_operation();
+
+    dimage<float,3> input_float3;
+    dimage<float> input_float;
+
+    if(frame->m_grayscale->value())
+    {
+        dimage_ptr<const float> input = imgframe->get_grayscale_input();
+        input_float.resize(input.width(), input.height());
+
+        init_filter(&input_float, input, op);
+    }
+    else
+    {
+        dimage_ptr<const float,3> input = imgframe->get_input();
+        input_float3.resize(input.width(), input.height());
+
+        init_filter(&input_float3, input, op);
+    }
+
     while(!frame->m_terminate_thread)
     {
         rod::unique_lock lk(frame->m_mtx_render_data);
-
-        ImageFrame *imgframe = frame->m_image_frame;
 
         // no render job? sleep
         if(imgframe == NULL || !frame->m_has_new_render_job)
@@ -345,15 +374,9 @@ void *MainFrame::render_thread(MainFrame *frame)
 
             // just process one (grayscale) channel?
             if(frame->m_grayscale->value())
-            {
-                call_filter(imgframe->get_grayscale_output(),
-                            imgframe->get_grayscale_input(), op);
-            }
+                call_filter(imgframe->get_grayscale_output(), &input_float, op);
             else
-            {
-                call_filter(imgframe->get_output(),
-                            imgframe->get_input(), op);
-            }
+                call_filter(imgframe->get_output(), &input_float3, op);
 
             timer.stop();
 
@@ -420,8 +443,6 @@ void MainFrame::open(const std::string &fname)
     m_image_frame->set_input_image(&img_float3);
 
     m_image_frame->copy_label(fname.c_str());
-
-    setup_recursive_filter(width, height, m_image_frame->get_input().rowstride());
 
     restart_render_thread();
 }
@@ -803,13 +824,13 @@ int main(int argc, char *argv[])
             dimage<uchar3,1> d_img;
             d_img.copy_from_host(imgdata, width, height);
 
-            setup_recursive_filter(width, height, d_img.rowstride());
-
             if(do_grayscale)
             {
                 dimage<float,1> d_gray;
                 d_gray.resize(d_img.width(), d_img.height());
                 grayscale(d_gray, &d_img);
+
+                init_filter(&d_gray, &d_gray, op);
 
                 call_filter(&d_gray, &d_gray, op, VERBOSE);
 
@@ -821,6 +842,8 @@ int main(int argc, char *argv[])
                 d_channels.resize(d_img.width(), d_img.height());
 
                 convert(&d_channels, &d_img);
+
+                init_filter(&d_channels, &d_channels, op);
 
                 call_filter(&d_channels, &d_channels, op, VERBOSE);
 
