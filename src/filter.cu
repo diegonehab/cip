@@ -405,19 +405,6 @@ void filter(dimage_ptr<float,3> img, const filter_operation &op);
 #endif
 /*}}}*/
 
-float bspline3(float r)
-{
-    r = std::abs(r);
-
-    if (r < 1.f) 
-        return (4.f + r*r*(-6.f + 3.f*r))/6.f;
-    else if (r < 2.f) 
-        return  (8.f + r*(-12.f + (6.f - r)*r))/6.f;
-    else 
-        return 0.f;
-}
-
-
 void init_blue_noise()
 {
     std::vector<float2> blue_noise;
