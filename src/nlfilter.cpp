@@ -66,6 +66,15 @@ public:
     }
 
 private:
+    void restart_render_thread()
+    {
+        stop_render_thread();
+        start_render_thread();
+    }
+
+    void start_render_thread();
+    void stop_render_thread();
+
     void update_image();
 
     filter_operation get_filter_operation() const;
@@ -117,20 +126,12 @@ MainFrame::MainFrame()
     m_post_filter->value(1);
     m_post_filter->callback(on_param_changed, this);
 
-    // kicks off the render thread
-    m_render_thread.start();
+    start_render_thread();
 }
 
 MainFrame::~MainFrame()
 {
-    // signal the render thread to terminate
-    rod::unique_lock lk(m_mtx_render_data);
-    m_terminate_thread = true;
-    m_wakeup.signal();
-    lk.unlock();
-
-    // just wait until it finishes
-    m_render_thread.join();
+    stop_render_thread();
 }
 
 filter_operation MainFrame::get_filter_operation() const
@@ -216,6 +217,27 @@ void setup_recursive_filter(int width, int height, int rowstride)
         cur_height = height;
         cur_rowstride = rowstride;
     }
+}
+
+void MainFrame::start_render_thread()
+{
+    if(!m_render_thread.is_started())
+    {
+        m_terminate_thread = false;
+        m_render_thread.start();
+    }
+}
+
+void MainFrame::stop_render_thread()
+{
+    // signal the render thread to terminate
+    rod::unique_lock lk(m_mtx_render_data);
+    m_terminate_thread = true;
+    m_wakeup.signal();
+    lk.unlock();
+
+    // just wait until it finishes
+    m_render_thread.join();
 }
 
 enum filter_flags
