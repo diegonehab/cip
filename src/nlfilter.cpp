@@ -419,6 +419,10 @@ void MainFrame::on_change_grayscale(bool gs)
 {
     if(m_image_frame)
         m_image_frame->set_grayscale(gs);
+
+    // must preprocess input image again
+    restart_render_thread();
+
     update_image();
 }
 
