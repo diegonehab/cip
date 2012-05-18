@@ -55,6 +55,11 @@ public:
         m_data.reset(data, m_rowstride*m_height*C);
     }
 
+    void reset()
+    {
+        reset(NULL,0,0,0);
+    }
+
     void copy_to_host(texel_type *out) const
     {
         for(int i=0; i<C; ++i)
