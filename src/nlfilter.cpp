@@ -321,97 +321,120 @@ void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
 // defined on timer.cpp
 std::string unit_value(double v, double base);
 
+void show_error(std::string *data)
+{
+    if(data != NULL)
+    {
+        fl_alert(data->c_str());
+        delete data;
+    }
+}
+
 void *MainFrame::render_thread(MainFrame *frame)
 {
-    ImageFrame *imgframe = frame->m_image_frame;
-
-    filter_operation op = frame->get_filter_operation();
-
-    dimage<float,3> input_float3;
-    dimage<float> input_float;
-
-    if(frame->m_grayscale->value())
+    try
     {
-        dimage_ptr<const float> input = imgframe->get_grayscale_input();
-        input_float.resize(input.width(), input.height());
+        ImageFrame *imgframe = frame->m_image_frame;
 
-        init_filter(&input_float, input, op);
-    }
-    else
-    {
-        dimage_ptr<const float,3> input = imgframe->get_input();
-        input_float3.resize(input.width(), input.height());
+        filter_operation op = frame->get_filter_operation();
 
-        init_filter(&input_float3, input, op);
-    }
+        dimage<float,3> input_float3;
+        dimage<float> input_float;
 
-    while(!frame->m_terminate_thread)
-    {
-        rod::unique_lock lk(frame->m_mtx_render_data);
-
-        // no render job? sleep
-        if(imgframe == NULL || !frame->m_has_new_render_job)
-            frame->m_wakeup.wait(lk);
-
-        // maybe it was set during wait
-        imgframe = frame->m_image_frame;
-
-        if(!frame->m_terminate_thread && imgframe != NULL &&
-           frame->m_has_new_render_job)
+        if(frame->m_grayscale->value())
         {
-            // fill the operation struct along with its parameters based
-            // on what is set by the user
-            frame->m_has_new_render_job = false;
+            dimage_ptr<const float> input = imgframe->get_grayscale_input();
+            input_float.resize(input.width(), input.height());
 
-            lk.unlock();
-
-            // lock buffers since we'll write on them
-            ImageFrame::OutputBufferLocker lkbuffers(*imgframe);
-
-            filter_operation op = frame->get_filter_operation();
-
-            cpu_timer timer;
-
-            // just process one (grayscale) channel?
-            if(frame->m_grayscale->value())
-                call_filter(imgframe->get_grayscale_output(), &input_float, op);
-            else
-                call_filter(imgframe->get_output(), &input_float3, op);
-
-            timer.stop();
-
-            // done working with buffers, release the lock
-            lkbuffers.unlock();
-
-            // avoids a deadlock in Fl::lock() because usually we're
-            // destroying the main window if terminate_thread is true
-            // at this point
-            if(frame->m_terminate_thread)
-                break;
-
-            // tell the image window to update its content and update
-            // performance counters
-            Fl::lock();
-
-            frame->m_status_fps->value(1.0/timer.elapsed());
-
-            int imgsize = imgframe->get_output().width() *
-                          imgframe->get_output().height();
-
-            float rate = imgsize / timer.elapsed();
-            std::string srate = unit_value(rate, 1000), unit;
-            {
-                std::istringstream ss(srate);
-                ss >> rate >> unit;
-                unit += "P/s ";
-            }
-            frame->m_status_rate->copy_label(unit.c_str());
-            frame->m_status_rate->value(rate);
-
-            imgframe->swap_buffers();
-            Fl::unlock();
-            Fl::awake((void *)NULL); // awake message loop processing
+            init_filter(&input_float, input, op);
         }
+        else
+        {
+            dimage_ptr<const float,3> input = imgframe->get_input();
+            input_float3.resize(input.width(), input.height());
+
+            init_filter(&input_float3, input, op);
+        }
+
+        while(!frame->m_terminate_thread)
+        {
+            rod::unique_lock lk(frame->m_mtx_render_data);
+
+            // no render job? sleep
+            if(imgframe == NULL || !frame->m_has_new_render_job)
+                frame->m_wakeup.wait(lk);
+
+            // maybe it was set during wait
+            imgframe = frame->m_image_frame;
+
+            if(!frame->m_terminate_thread && imgframe != NULL &&
+               frame->m_has_new_render_job)
+            {
+                // fill the operation struct along with its parameters based
+                // on what is set by the user
+                frame->m_has_new_render_job = false;
+
+                lk.unlock();
+
+                // lock buffers since we'll write on them
+                ImageFrame::OutputBufferLocker lkbuffers(*imgframe);
+
+                filter_operation op = frame->get_filter_operation();
+
+                cpu_timer timer;
+
+                // just process one (grayscale) channel?
+                if(frame->m_grayscale->value())
+                    call_filter(imgframe->get_grayscale_output(), &input_float, op);
+                else
+                    call_filter(imgframe->get_output(), &input_float3, op);
+
+                timer.stop();
+
+                // done working with buffers, release the lock
+                lkbuffers.unlock();
+
+                // avoids a deadlock in Fl::lock() because usually we're
+                // destroying the main window if terminate_thread is true
+                // at this point
+                if(frame->m_terminate_thread)
+                    break;
+
+                // tell the image window to update its content and update
+                // performance counters
+                Fl::lock();
+
+                frame->m_status_fps->value(1.0/timer.elapsed());
+
+                int imgsize = imgframe->get_output().width() *
+                              imgframe->get_output().height();
+
+                float rate = imgsize / timer.elapsed();
+                std::string srate = unit_value(rate, 1000), unit;
+                {
+                    std::istringstream ss(srate);
+                    ss >> rate >> unit;
+                    unit += "P/s ";
+                }
+                frame->m_status_rate->copy_label(unit.c_str());
+                frame->m_status_rate->value(rate);
+
+                imgframe->swap_buffers();
+                Fl::unlock();
+                Fl::awake((void *)NULL); // awake message loop processing
+            }
+        }
+    }
+    catch(std::exception &e)
+    {
+        std::ostringstream ss;
+        ss << "Render thread error: " << e.what();
+
+        Fl::awake((Fl_Awake_Handler)&show_error, new std::string(ss.str()));
+    }
+    catch(...)
+    {
+        Fl::awake((Fl_Awake_Handler)&show_error, new std::string("Render thread error: unknown"));
     }
 }
 
