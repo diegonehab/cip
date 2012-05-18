@@ -125,8 +125,6 @@ MainFrame::MainFrame()
     m_post_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
     m_post_filter->value(1);
     m_post_filter->callback(on_param_changed, this);
-
-    start_render_thread();
 }
 
 MainFrame::~MainFrame()
@@ -424,6 +422,8 @@ void MainFrame::open(const std::string &fname)
     m_image_frame->copy_label(fname.c_str());
 
     setup_recursive_filter(width, height, m_image_frame->get_input().rowstride());
+
+    restart_render_thread();
 }
 
 void MainFrame::on_file_open()
