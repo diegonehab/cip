@@ -68,6 +68,8 @@ public:
 private:
     void update_image();
 
+    filter_operation get_filter_operation() const;
+
     static void *render_thread(MainFrame *frame);
 
     rod::thread m_render_thread;
@@ -129,6 +131,61 @@ MainFrame::~MainFrame()
 
     // just wait until it finishes
     m_render_thread.join();
+}
+
+filter_operation MainFrame::get_filter_operation() const
+{
+    filter_operation op;
+
+    op.type = (effect_type)(ptrdiff_t)m_effects->mvalue()->user_data_;
+
+    op.pre_filter = (filter_type)(ptrdiff_t)m_pre_filter->mvalue()->user_data_;
+    op.post_filter = (filter_type)(ptrdiff_t)m_post_filter->mvalue()->user_data_;
+
+
+    if(const ParamPosterizeUI *panel = dynamic_cast<const ParamPosterizeUI *>(m_param_panel))
+        op.levels = std::max<int>(2,panel->levels->value());
+    else if(const ParamScaleUI *panel = dynamic_cast<const ParamScaleUI *>(m_param_panel))
+        op.scale = panel->scale->value();
+    else if(const ParamBiasUI *panel = dynamic_cast<const ParamBiasUI *>(m_param_panel))
+        op.bias = panel->bias->value();
+    else if(const ParamRootUI *panel = dynamic_cast<const ParamRootUI *>(m_param_panel))
+        op.degree = panel->degree->value();
+    else if(const ParamThresholdUI *panel = dynamic_cast<const ParamThresholdUI *>(m_param_panel))
+        op.threshold = panel->threshold->value();
+    else if(const ParamLaplaceEdgeEnhancementUI *panel = dynamic_cast<const ParamLaplaceEdgeEnhancementUI *>(m_param_panel))
+        op.multiple = panel->multiple->value();
+    else if(const ParamYaroslavskyBilateralUI *panel = dynamic_cast<const ParamYaroslavskyBilateralUI *>(m_param_panel))
+    {
+        op.rho = panel->rho->value();
+        op.h = panel->h->value();
+    }
+    else if(const ParamBrightnessContrastUI *panel = dynamic_cast<const ParamBrightnessContrastUI *>(m_param_panel))
+    {
+        op.brightness = panel->brightness->value();
+        op.contrast = panel->contrast->value();
+    }
+    else if(const ParamHueSaturationLightnessUI *panel = dynamic_cast<const ParamHueSaturationLightnessUI *>(m_param_panel))
+    {
+        op.hue = panel->hue->value();
+        op.saturation = panel->saturation->value();
+        op.lightness = panel->lightness->value();
+    }
+    else if(const ParamReplacementUI *panel = dynamic_cast<const ParamReplacementUI *>(m_param_panel))
+    {
+        unsigned char r,g,b;
+        Fl::get_color(panel->old_color->color(), r, g, b);
+        op.old_color = make_float3(r/255.0f, g/255.0f, b/255.0f);
+
+        Fl::get_color(panel->new_color->color(), r, g, b);
+        op.new_color = make_float3(r/255.0f, g/255.0f, b/255.0f);
+
+        op.tau.x = panel->tau_red->value();
+        op.tau.y = panel->tau_green->value();
+        op.tau.z = panel->tau_blue->value();
+    }
+
+    return op;
 }
 
 // setup recursive filters and other stuff
@@ -255,62 +312,14 @@ void *MainFrame::render_thread(MainFrame *frame)
         {
             // fill the operation struct along with its parameters based
             // on what is set by the user
-            filter_operation op;
-
-            op.type = (effect_type)(ptrdiff_t)frame->m_effects->mvalue()->user_data_;
-
-            op.pre_filter = (filter_type)(ptrdiff_t)frame->m_pre_filter->mvalue()->user_data_;
-            op.post_filter = (filter_type)(ptrdiff_t)frame->m_post_filter->mvalue()->user_data_;
-
-
-            if(const ParamPosterizeUI *panel = dynamic_cast<const ParamPosterizeUI *>(frame->m_param_panel))
-                op.levels = std::max<int>(2,panel->levels->value());
-            else if(const ParamScaleUI *panel = dynamic_cast<const ParamScaleUI *>(frame->m_param_panel))
-                op.scale = panel->scale->value();
-            else if(const ParamBiasUI *panel = dynamic_cast<const ParamBiasUI *>(frame->m_param_panel))
-                op.bias = panel->bias->value();
-            else if(const ParamRootUI *panel = dynamic_cast<const ParamRootUI *>(frame->m_param_panel))
-                op.degree = panel->degree->value();
-            else if(const ParamThresholdUI *panel = dynamic_cast<const ParamThresholdUI *>(frame->m_param_panel))
-                op.threshold = panel->threshold->value();
-            else if(const ParamLaplaceEdgeEnhancementUI *panel = dynamic_cast<const ParamLaplaceEdgeEnhancementUI *>(frame->m_param_panel))
-                op.multiple = panel->multiple->value();
-            else if(const ParamYaroslavskyBilateralUI *panel = dynamic_cast<const ParamYaroslavskyBilateralUI *>(frame->m_param_panel))
-            {
-                op.rho = panel->rho->value();
-                op.h = panel->h->value();
-            }
-            else if(const ParamBrightnessContrastUI *panel = dynamic_cast<const ParamBrightnessContrastUI *>(frame->m_param_panel))
-            {
-                op.brightness = panel->brightness->value();
-                op.contrast = panel->contrast->value();
-            }
-            else if(const ParamHueSaturationLightnessUI *panel = dynamic_cast<const ParamHueSaturationLightnessUI *>(frame->m_param_panel))
-            {
-                op.hue = panel->hue->value();
-                op.saturation = panel->saturation->value();
-                op.lightness = panel->lightness->value();
-            }
-            else if(const ParamReplacementUI *panel = dynamic_cast<const ParamReplacementUI *>(frame->m_param_panel))
-            {
-                unsigned char r,g,b;
-                Fl::get_color(panel->old_color->color(), r, g, b);
-                op.old_color = make_float3(r/255.0f, g/255.0f, b/255.0f);
-
-                Fl::get_color(panel->new_color->color(), r, g, b);
-                op.new_color = make_float3(r/255.0f, g/255.0f, b/255.0f);
-
-                op.tau.x = panel->tau_red->value();
-                op.tau.y = panel->tau_green->value();
-                op.tau.z = panel->tau_blue->value();
-            }
-
             frame->m_has_new_render_job = false;
 
             lk.unlock();
 
             // lock buffers since we'll write on them
             ImageFrame::OutputBufferLocker lkbuffers(*imgframe);
+
+            filter_operation op = frame->get_filter_operation();
 
             cpu_timer timer;
 
