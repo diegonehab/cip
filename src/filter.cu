@@ -247,50 +247,30 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
     dim3 bdim(BW_F1,BH_F1),
          gdim((img.width()+bdim.x-1)/bdim.x, (img.height()+bdim.y-1)/bdim.y);
 
+#define CASE(EFFECT) \
+    case EFFECT:\
+        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&temp); \
+        break
+
     switch(op.type)
     {
-    case EFFECT_IDENTITY:
-        filter_kernel1<EFFECT_IDENTITY,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_POSTERIZE:
-        filter_kernel1<EFFECT_POSTERIZE,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_SCALE:
-        filter_kernel1<EFFECT_SCALE,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_BIAS:
-        filter_kernel1<EFFECT_BIAS,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_ROOT:
-        filter_kernel1<EFFECT_ROOT,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_THRESHOLD:
-        filter_kernel1<EFFECT_THRESHOLD,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_REPLACEMENT:
-        filter_kernel1<EFFECT_REPLACEMENT,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_GRADIENT_EDGE_DETECTION:
-        filter_kernel1<EFFECT_GRADIENT_EDGE_DETECTION,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_LAPLACIAN:
-        filter_kernel1<EFFECT_LAPLACIAN,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_LAPLACE_EDGE_ENHANCEMENT:
-        filter_kernel1<EFFECT_LAPLACE_EDGE_ENHANCEMENT,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_YAROSLAVSKY_BILATERAL:
-        filter_kernel1<EFFECT_YAROSLAVSKY_BILATERAL,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_BRIGHTNESS_CONTRAST:
-        filter_kernel1<EFFECT_BRIGHTNESS_CONTRAST,C><<<gdim, bdim>>>(&temp);
-        break;
-    case EFFECT_HUE_SATURATION_LIGHTNESS:
-        filter_kernel1<EFFECT_HUE_SATURATION_LIGHTNESS,C><<<gdim, bdim>>>(&temp);
-        break;
+    CASE(EFFECT_IDENTITY);
+    CASE(EFFECT_POSTERIZE);
+    CASE(EFFECT_SCALE);
+    CASE(EFFECT_BIAS);
+    CASE(EFFECT_ROOT);
+    CASE(EFFECT_THRESHOLD);
+    CASE(EFFECT_REPLACEMENT);
+    CASE(EFFECT_GRADIENT_EDGE_DETECTION);
+    CASE(EFFECT_LAPLACIAN);
+    CASE(EFFECT_LAPLACE_EDGE_ENHANCEMENT);
+    CASE(EFFECT_YAROSLAVSKY_BILATERAL);
+    CASE(EFFECT_BRIGHTNESS_CONTRAST);
+    CASE(EFFECT_HUE_SATURATION_LIGHTNESS);
     default:
         assert(false);
     }
+#undef CASE
                    
     {
         dim3 bdim(BW_F2,BH_F2),
