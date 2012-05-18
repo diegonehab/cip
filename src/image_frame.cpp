@@ -143,24 +143,23 @@ struct ImageFrame::impl
 
 void null_cb(Fl_Widget *, void*) {}
 
-ImageFrame::ImageFrame(const uchar4 *data, int w, int h)
+ImageFrame::ImageFrame()
     : Fl_Gl_Window(0,0,640,480)
 {
     pimpl = new impl();
 
     try
     {
+        // disables window closing
+        callback(null_cb);
+
+        show();
+        make_current();
+
         cudaGLSetGLDevice(0);
         check_cuda_error("Init CUDA-OpenGL interoperability");
 
-        callback(null_cb);
-
-        // this is important, it'll set up GL context properly
-        show();
-
-        enable_vsync();
-
-        set_input_image(data, w, h);
+//        enable_vsync();
     }
     catch(...)
     {
@@ -187,9 +186,9 @@ ImageFrame::~ImageFrame()
     delete pimpl;
 }
 
-void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
+void ImageFrame::set_input_image(dimage_ptr<float3> img)
 {
-    if(w <= 0 || h  <= 0)
+    if(img.width() <= 0 || img.height()  <= 0)
         throw std::runtime_error("Invalid image dimensions");
 
     make_current();
@@ -197,23 +196,19 @@ void ImageFrame::set_input_image(const uchar4 *data, int w, int h)
     if(!pimpl->gl_ok)
         pimpl->initgl();
 
-    dimage<uchar3> d_img;
-
-    d_img.copy_from_host(data, w, h);
-
-    pimpl->img_input.resize(w,h);
-    convert(&pimpl->img_input, &d_img);
-    grayscale(pimpl->img_input_grayscale, &d_img);
+    pimpl->img_input.resize(img.width(),img.height());
+    convert(&pimpl->img_input, img);
+    grayscale(pimpl->img_input_grayscale, img);
 
     // to create textures and setup output buffers
     set_grayscale(pimpl->grayscale);
 
-    pimpl->img_buffer.resize(w,h);
-    pimpl->img_backbuffer.resize(w,h);
+    pimpl->img_buffer.resize(img.width(),img.height());
+    pimpl->img_backbuffer.resize(img.width(),img.height());
 
-    resize(x(),y(),w,h);
+    resize(x(),y(),img.width(),img.height());
 
-    glViewport(0,0,w,h);
+    glViewport(0,0,img.width(),img.height());
     check_glerror();
 }
 

@@ -380,12 +380,15 @@ void MainFrame::open(const std::string &fname)
 
     // create the image frame with the image data
     if(!m_image_frame)
-    {
-        m_image_frame = new ImageFrame(&imgdata[0], width, height);
-        m_image_frame->show();
-    }
-    else
-        m_image_frame->set_input_image(&imgdata[0], width, height);
+        m_image_frame = new ImageFrame();
+
+    dimage<uchar3> img_byte3;
+    img_byte3.copy_from_host(&imgdata[0], width, height);
+
+    dimage<float3> img_float3(width, height);
+    convert(&img_float3, &img_byte3);
+
+    m_image_frame->set_input_image(&img_float3);
 
     m_image_frame->copy_label(fname.c_str());
 
