@@ -182,6 +182,8 @@ void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float3,1> in)
         return;
 
     int idx = in.offset_at(x,y);
+    in += idx;
+    out += idx;
 
     float3 p = *in;
     *out = p.x*0.2126f + p.y*0.7152f + p.z*0.0722f;
