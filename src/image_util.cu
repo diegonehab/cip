@@ -96,6 +96,8 @@ void convert(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
 template void convert(dimage_ptr<float3> out, dimage_ptr<const float,3> in);
 template void convert(dimage_ptr<uchar3> out, dimage_ptr<const float,3> in);
 
+template void convert(dimage_ptr<float3> out, dimage_ptr<const uchar3> in);
+
 template void convert(dimage_ptr<float,3> out, dimage_ptr<const float3> in);
 template void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3> in);
 
