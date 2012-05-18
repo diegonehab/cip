@@ -10,7 +10,7 @@ __device__ inline
 float lrgb2srgb(float v)
 {
     v = saturate(v);
-    const float a = 0.055f;
+//    const float a = 0.055f;
     if(v <= 0.0031308f)
         return 12.92f*v;
     else
@@ -31,7 +31,7 @@ __device__ inline
 float srgb2lrgb(float v)
 {
     v = saturate(v);
-    const float a = 0.055f;
+//    const float a = 0.055f;
     if(v <= 0.04045f)
         return v/12.92f;
     else
