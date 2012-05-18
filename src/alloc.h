@@ -22,6 +22,9 @@ T *cuda_new(size_t elements)
 template <class T>
 void cuda_delete(T *ptr)
 {
+    if(ptr == NULL)
+        return;
+
     cudaFree((void *)ptr);
     check_cuda_error("Error freeing memory");
 }
