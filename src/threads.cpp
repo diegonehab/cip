@@ -111,8 +111,7 @@ struct thread::impl
     function_type user_thread_start;
     void *user_data;
     std::string error;
-    bool is_running,
-         is_joined;
+    bool is_running;
 
     static void *thread_start(impl *pimpl)
     {
@@ -145,7 +144,6 @@ thread::thread(function_type thread_start, void *data, bool do_start)
     pimpl->user_thread_start = thread_start;
     pimpl->user_data = data;
     pimpl->is_running = false;
-    pimpl->is_joined = false;
 
     bool attr_init = false;
 
@@ -189,20 +187,19 @@ void thread::start()
 
 void thread::join()
 {
-    if(is_started() && !pimpl->is_joined)
+    if(is_started())
     {
         check_error(pthread_join(pimpl->thread,NULL), "pthread_join");
         if(!pimpl->error.empty())
             throw std::runtime_error(pimpl->error);
 
-        pimpl->is_joined = true;
         m_started = false;
     }
 }
 
 bool thread::try_join(double wait_secs)
 {
-    if(is_started() && !pimpl->is_joined)
+    if(is_started())
     {
         if(wait_secs > 0)
         {
@@ -233,7 +230,7 @@ bool thread::try_join(double wait_secs)
         if(!pimpl->error.empty())
             throw std::runtime_error(pimpl->error);
 
-        pimpl->is_joined = true;
+        m_started = false;
     }
     return true;
 }
