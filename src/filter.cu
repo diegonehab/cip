@@ -236,7 +236,7 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
     return plan;
 }/*}}}*/
 
-void filter_free(filter_plan *plan)/*{{{*/
+void free(filter_plan *plan)/*{{{*/
 {
     delete plan;
 }/*}}}*/

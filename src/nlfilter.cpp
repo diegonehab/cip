@@ -318,7 +318,7 @@ void *MainFrame::render_thread(MainFrame *frame)
         Fl::awake((Fl_Awake_Handler)&show_error, new std::string("Render thread error: unknown"));
     }
 
-    filter_free(plan);
+    free(plan);
 }
 
 void MainFrame::on_change_grayscale(bool gs)
@@ -762,7 +762,7 @@ int main(int argc, char *argv[])
                 filter(plan, &d_gray, op);
                 timer->stop();
 
-                filter_free(plan);
+                free(plan);
 
                 convert(&d_img, &d_gray);
             }
@@ -785,7 +785,7 @@ int main(int argc, char *argv[])
                 filter(plan, &d_channels, op);
                 timer->stop();
 
-                filter_free(plan);
+                free(plan);
 
                 convert(&d_img, &d_channels);
             }

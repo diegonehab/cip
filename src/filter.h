@@ -99,7 +99,7 @@ template <int C> // C = number of channels
 filter_plan *filter_create_plan(dimage_ptr<const float,C> src_img, 
                                 const filter_operation &op, int flags=0);
 
-void filter_free(filter_plan *plan);
+void free(filter_plan *plan);
 
 template <int C> // C = number of channels
 void filter(filter_plan *plan, dimage_ptr<float, C> img, 
