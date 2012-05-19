@@ -10,40 +10,135 @@ const int WS = 32;
 #define ORDER 2
 #include "alg5.cu"
 
+struct recfilter5_plan
+{
+    recfilter5_plan() : a_in(NULL) {}
+
+    virtual ~recfilter5_plan()
+    {
+        if(a_in != NULL)
+            cudaFreeArray(a_in);
+    }
+
+    int width, height;
+    int rowstride;
+    float inv_width, inv_height;
+    int m_size, n_size, last_m, last_n;
+    BorderType border_type;
+    int border;
+
+    cudaArray *a_in;
+};
+
 template <int R>
-struct recfilter5_plan_type
+struct recfilter5_plan_R : recfilter5_plan
 {
     dvector<Matrix<float,R,WS> > d_pybar,
                                  d_ezhat,
                                  d_ptucheck,
                                  d_etvtilde;
-    int width, height;
-    int rowstride;
-    float inv_width, inv_height;
-    int m_size, n_size;
-    BorderType border_type;
+    Vector<float, R+1> weights;
 
-    cudaArray *a_in;
+    Matrix<float,R,WS> AFP_T, ARE_T;
+    Matrix<float,WS,WS> AFB_T, ARB_T;
+
+    Matrix<float,R,R> AbF_T, AbR_T, AbF, AbR,
+                      HARB_AFP_T, HARB_AFP;
+    Matrix<float,R,WS> ARB_AFP_T, TAFB, HARB_AFB;
 };
 
-recfilter5_plan_type<1> *plan_5_1 = NULL;
-recfilter5_plan_type<2> *plan_5_2 = NULL;
-
-/**
- *  @brief Recursive Filtering Algorithm 4 for filter order 2
- *
- *  This function computes the algorithm 4_2.
- *
- *  @param[in] h_img Input image
- *  @param[in] width Image width
- *  @param[in] height Image height
- *  @param[in] a0 Feedback coefficient
- *  @param[in] b1 Feedforward coefficient
- */
-template <int R>
-void recfilter5(float *d_output, const float *d_input,
-                        recfilter5_plan_type<R> &plan)
+namespace
 {
+const recfilter5_plan *g_loaded_plan_in_gpu = NULL;
+
+template<int R>
+void load_plan(const recfilter5_plan_R<R> &plan)
+{
+    std::ostringstream ss;
+    ss << "c5_" << R << "_";
+    std::string prefix = ss.str();
+
+    const recfilter5_plan_R<R> *gpu_plan
+        = dynamic_cast<const recfilter5_plan_R<R> *>(g_loaded_plan_in_gpu);
+
+
+    if(!gpu_plan || gpu_plan->weights != plan.weights)
+    {
+        copy_to_symbol(prefix+"weights", plan.weights);
+
+        copy_to_symbol(prefix+"AbF_T", plan.AbF_T);
+        copy_to_symbol(prefix+"AbR_T", plan.AbR_T);
+        copy_to_symbol(prefix+"HARB_AFP_T", plan.HARB_AFP_T);
+
+        copy_to_symbol(prefix+"AbF", plan.AbF);
+        copy_to_symbol(prefix+"AbR", plan.AbR);
+        copy_to_symbol(prefix+"HARB_AFP", plan.HARB_AFP);
+
+        copy_to_symbol(prefix+"ARE_T", plan.ARE_T);
+        copy_to_symbol(prefix+"ARB_AFP_T", plan.ARB_AFP_T);
+        copy_to_symbol(prefix+"TAFB", plan.TAFB);
+        copy_to_symbol(prefix+"HARB_AFB", plan.HARB_AFB);
+    }
+
+    if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->border != plan.border)
+        copy_to_symbol(prefix+"border",plan.border);
+
+    if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->rowstride!=plan.rowstride)
+        copy_to_symbol(prefix+"rowstride", plan.rowstride);
+
+    if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->width != plan.width
+       || g_loaded_plan_in_gpu->border != plan.border)
+    {
+        copy_to_symbol(prefix+"width", plan.width); 
+        copy_to_symbol(prefix+"inv_width", plan.inv_width); 
+        copy_to_symbol(prefix+"m_size", plan.m_size); 
+        copy_to_symbol(prefix+"last_m", plan.last_m); 
+    }
+
+    if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->height != plan.height
+       || g_loaded_plan_in_gpu->border != plan.border)
+    {
+        copy_to_symbol(prefix+"inv_height", plan.inv_height);
+        copy_to_symbol(prefix+"height", plan.height);
+        copy_to_symbol(prefix+"n_size", plan.n_size);
+        copy_to_symbol(prefix+"last_n", plan.last_n);
+    }
+
+    if(!g_loaded_plan_in_gpu)
+    {
+        t_in.normalized = true;
+        t_in.filterMode = cudaFilterModePoint;
+    }
+
+    if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->border_type != plan.border_type)
+    {
+        switch(plan.border_type)
+        {
+        case CLAMP_TO_ZERO:
+            t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeBorder;
+            break;
+        case CLAMP_TO_EDGE:
+            t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeClamp;
+            break;
+        case REPEAT:
+            t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeWrap;
+            break;
+        case REFLECT:
+            t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeMirror;
+            break;
+        }
+    }
+
+    g_loaded_plan_in_gpu = &plan;
+}
+} // local namespace
+
+
+template <int R>
+void recfilter5(recfilter5_plan_R<R> &plan,float *d_output,const float *d_input)
+{
+    load_plan(plan);
+
     cudaMemcpy2DToArray(plan.a_in, 0, 0, d_input, plan.rowstride*sizeof(float),
                         plan.width*sizeof(float), plan.height,
                       cudaMemcpyDeviceToDevice);
@@ -81,168 +176,115 @@ void recfilter5(float *d_output, const float *d_input,
     cudaUnbindTexture(t_in);
 }
 
-void recfilter5(float *d_output, const float *d_input)
+void recfilter5(recfilter5_plan *plan, float *d_output, const float *d_input)
 {
-    if(plan_5_1 != NULL)
-        recfilter5(d_output, d_input, *plan_5_1);
-    else if(plan_5_2 != NULL)
-        recfilter5(d_output, d_input, *plan_5_2);
+    if(recfilter5_plan_R<1> *plan_R = dynamic_cast<recfilter5_plan_R<1>*>(plan))
+        recfilter5(*plan_R, d_output, d_input);
+    else if(recfilter5_plan_R<2> *plan_R = dynamic_cast<recfilter5_plan_R<2>*>(plan))
+        recfilter5(*plan_R, d_output, d_input);
     else
-        throw std::runtime_error("Recursive filter plan not configured!");
+        throw std::runtime_error("Bad plan for recfilter5");
 }
 
-void recfilter5(float *d_inout)
+void recfilter5(recfilter5_plan *plan, float *d_inout)
 {
-    recfilter5(d_inout, d_inout);
+    recfilter5(plan, d_inout, d_inout);
 }
 
 template <int R>
-void recfilter5_setup(int width, int height, int rowstride,
-                              const Vector<float, R+1> &w, 
-                              BorderType border_type, int border,
-                              recfilter5_plan_type<R> *&plan)
+recfilter5_plan *
+recfilter5_create_plan(int width, int height, int rowstride,
+                       const Vector<float, R+1> &w, 
+                       BorderType border_type, int border)
 {
     const int B = 32;
 
-    Matrix<float,R,R> Ir = identity<float,R,R>();
-    Matrix<float,B,R> Zbr = zeros<float,B,R>();
-    Matrix<float,R,B> Zrb = zeros<float,R,B>();
-    Matrix<float,B,B> Ib = identity<float,B,B>();
+    recfilter5_plan_R<R> *plan = new recfilter5_plan_R<R>;
 
-    Matrix<float,R,B> AFP_T = fwd(Ir, Zrb, w),
-                      ARE_T = rev(Zrb, Ir, w);
-    Matrix<float,B,B> AFB_T = fwd(Zbr, Ib, w),
-                      ARB_T = rev(Ib, Zbr, w);
-
-    Matrix<float,R,R> AbF_T = tail<R>(AFP_T),
-                      AbR_T = head<R>(ARE_T),
-                      AbF = transp(AbF_T),
-                      AbR = transp(AbR_T),
-                      HARB_AFP_T = AFP_T*head<R>(ARB_T),
-                      HARB_AFP = transp(HARB_AFP_T);
-    Matrix<float,R,B> ARB_AFP_T = AFP_T*ARB_T,
-                      TAFB = transp(tail<R>(AFB_T)),
-                      HARB_AFB = transp(AFB_T*head<R>(ARB_T));
-
-
-    int bleft, bright, btop, bbottom;
-    calc_borders(&bleft, &btop, &bright, &bbottom, width, height, border);
-
-    const int m_size = (width+bleft+bright+WS-1)/WS,
-              n_size = (height+btop+bbottom+WS-1)/WS;
-
-    int last_m = (bleft+width-1)/WS,
-        last_n = (btop+height-1)/WS;
-    float inv_width = 1.f/width, inv_height = 1.f/height;
-
-    std::ostringstream ss;
-    ss << "c5_" << R << "_";
-    std::string prefix = ss.str();
-
-    copy_to_symbol(prefix+"weights", w);
-
-    copy_to_symbol(prefix+"AbF_T", AbF_T);
-    copy_to_symbol(prefix+"AbR_T", AbR_T);
-    copy_to_symbol(prefix+"HARB_AFP_T", HARB_AFP_T);
-
-    copy_to_symbol(prefix+"AbF", AbF);
-    copy_to_symbol(prefix+"AbR", AbR);
-    copy_to_symbol(prefix+"HARB_AFP", HARB_AFP);
-
-    copy_to_symbol(prefix+"ARE_T", ARE_T);
-    copy_to_symbol(prefix+"ARB_AFP_T", ARB_AFP_T);
-    copy_to_symbol(prefix+"TAFB", TAFB);
-    copy_to_symbol(prefix+"HARB_AFB", HARB_AFB);
-
-    copy_to_symbol(prefix+"border",border);
-    copy_to_symbol(prefix+"inv_width", inv_width); 
-    copy_to_symbol(prefix+"inv_height", inv_height);
-    copy_to_symbol(prefix+"width", width); 
-    copy_to_symbol(prefix+"height", height);
-    copy_to_symbol(prefix+"m_size", m_size); 
-    copy_to_symbol(prefix+"n_size", n_size);
-    copy_to_symbol(prefix+"last_m", last_m); 
-    copy_to_symbol(prefix+"last_n", last_n);
-    copy_to_symbol(prefix+"rowstride", rowstride);
-
-    t_in.normalized = true;
-    t_in.filterMode = cudaFilterModePoint;
-
-    switch(border_type)
+    try
     {
-    case CLAMP_TO_ZERO:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeBorder;
-        break;
-    case CLAMP_TO_EDGE:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeClamp;
-        break;
-    case REPEAT:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeWrap;
-        break;
-    case REFLECT:
-        t_in.addressMode[0] = t_in.addressMode[1] = cudaAddressModeMirror;
-        break;
+        Matrix<float,R,R> Ir = identity<float,R,R>();
+        Matrix<float,B,R> Zbr = zeros<float,B,R>();
+        Matrix<float,R,B> Zrb = zeros<float,R,B>();
+        Matrix<float,B,B> Ib = identity<float,B,B>();
+
+        // depends on weight
+        plan->weights = w;
+        plan->AFP_T = fwd(Ir, Zrb, w);
+        plan->ARE_T = rev(Zrb, Ir, w);
+        plan->AFB_T = fwd(Zbr, Ib, w);
+        plan->ARB_T = rev(Ib, Zbr, w);
+
+        plan->AbF_T = tail<R>(plan->AFP_T);
+        plan->AbR_T = head<R>(plan->ARE_T);
+        plan->AbF = transp(plan->AbF_T);
+        plan->AbR = transp(plan->AbR_T);
+        plan->HARB_AFP_T = plan->AFP_T*head<R>(plan->ARB_T);
+        plan->HARB_AFP = transp(plan->HARB_AFP_T);
+        plan->ARB_AFP_T = plan->AFP_T*plan->ARB_T;
+        plan->TAFB = transp(tail<R>(plan->AFB_T));
+        plan->HARB_AFB = transp(plan->AFB_T*head<R>(plan->ARB_T));
+
+        int bleft, bright, btop, bbottom;
+        calc_borders(&bleft, &btop, &bright, &bbottom, width, height, border);
+
+        // depends on width and border
+        plan->m_size = (width+bleft+bright+WS-1)/WS,
+        plan->last_m = (bleft+width-1)/WS;
+        plan->width = width;
+        plan->inv_width = 1.f/width;
+
+        // depends on height and border
+        plan->n_size = (height+btop+bbottom+WS-1)/WS;
+        plan->last_n = (btop+height-1)/WS;
+        plan->height = height;
+        plan->inv_height = 1.f/height;
+
+        // depends on rowstride
+        plan->rowstride = rowstride;
+
+        // depends on border
+        plan->border_type = border_type;
+        plan->border = border;
+
+        // depends on width, height and border
+        plan->d_pybar.resize(plan->n_size*plan->m_size);
+        plan->d_ezhat.resize(plan->n_size*plan->m_size);
+        plan->d_ptucheck.resize(plan->n_size*plan->m_size);
+        plan->d_etvtilde.resize(plan->n_size*plan->m_size);
+
+        cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float>();
+        cudaMallocArray(&plan->a_in, &ccd, width, height);
+
+        load_plan(*plan);
+    }
+    catch(...)
+    {
+        delete plan;
+        throw;
     }
 
-    if(plan != NULL)
-        recfilter5_free();
-
-    plan = new recfilter5_plan_type<R>();
-
-    cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float>();
-    cudaMallocArray(&plan->a_in, &ccd, width, height);
-
-    t_in.normalized = true;
-    t_in.filterMode = cudaFilterModePoint;
-
-    plan->rowstride = rowstride;
-
-    plan->d_pybar.resize(n_size*m_size);
-    plan->d_ezhat.resize(n_size*m_size);
-    plan->d_ptucheck.resize(n_size*m_size);
-    plan->d_etvtilde.resize(n_size*m_size);
-    plan->border_type = border_type;
-
-    plan->width = width;
-    plan->height = height;
-    plan->inv_width = inv_width;
-    plan->inv_height = inv_height;
-    plan->m_size = m_size;
-    plan->n_size = n_size;
+    return plan;
 }
 
-template <>
-void recfilter5_setup<1>(int width, int height, int rowstride,
-                              const Vector<float, 1+1> &w, 
-                              BorderType border_type, int border)
-{
-    recfilter5_setup(width, height, rowstride, w, border_type, border,
-                             plan_5_1);
-}
+template
+recfilter5_plan *
+recfilter5_create_plan<1>(int width, int height, int rowstride,
+                          const Vector<float, 1+1> &w, 
+                          BorderType border_type, int border);
 
-template <>
-void recfilter5_setup<2>(int width, int height, int rowstride,
-                              const Vector<float, 2+1> &w, 
-                              BorderType border_type, int border)
-{
-    recfilter5_setup(width, height, rowstride, w, border_type, border,
-                             plan_5_2);
-}
+template
+recfilter5_plan *
+recfilter5_create_plan<2>(int width, int height, int rowstride,
+                          const Vector<float, 2+1> &w, 
+                          BorderType border_type, int border);
 
-void recfilter5_free()
+void recfilter5_free(recfilter5_plan *plan)
 {
-    if(plan_5_1)
-    {
-        cudaFreeArray(plan_5_1->a_in);
-        delete plan_5_1;
-        plan_5_1 = NULL;
-    }
-    if(plan_5_2)
-    {
-        cudaFreeArray(plan_5_2->a_in);
-        delete plan_5_2;
-        plan_5_2 = NULL;
-    }
+    if(g_loaded_plan_in_gpu == plan)
+        g_loaded_plan_in_gpu = NULL;
+
+    delete plan;
 }
 
 

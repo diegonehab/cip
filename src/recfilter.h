@@ -246,18 +246,18 @@ Matrix<T,R,N> tailT(const Matrix<T,M,N> &mat)
     return transp(tail<R>(transp(mat)));
 }
 
+struct recfilter5_plan;
+
 typedef float pixel_type;
 template <int R>
-void recfilter5_setup(int width, int height, int rowstride,
-                              const Vector<float, R+1> &w,
-                              BorderType border_type=CLAMP_TO_ZERO, 
-                              int border=1);
-void recfilter5_free();
+recfilter5_plan *recfilter5_create_plan(int width, int height, int rowstride,
+                                        const Vector<float, R+1> &w,
+                                        BorderType border_type=CLAMP_TO_ZERO, 
+                                        int border=1);
+void recfilter5_free(recfilter5_plan *plan);
 
-void recfilter5(float *d_inout);
-
-void recfilter5(float *d_output,
-                        const float *d_input);
+void recfilter5(recfilter5_plan *plan, float *d_inout);
+void recfilter5(recfilter5_plan *plan, float *d_output, const float *d_input);
 
 #endif
 

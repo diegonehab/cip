@@ -99,6 +99,8 @@ struct filter_plan
     cudaArray *a_in;
 
     filter_operation op;
+
+    recfilter5_plan *recfilter_plan;
 };
 
 template <int C>
@@ -160,8 +162,15 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
     weights[0] = 1+a;
     weights[1] = a;
 
-    recfilter5_setup<1>(img.width(),img.height(),img.rowstride(),
-                        weights, CLAMP_TO_EDGE, 1);
+    if(op.post_filter == FILTER_CARDINAL_BSPLINE3 ||
+       op.pre_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        plan->recfilter_plan = 
+            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
+                                      weights, CLAMP_TO_EDGE, 1);
+    }
+    else
+        plan->recfilter_plan = NULL;
 
     base_timer *timer = NULL;
 
@@ -180,7 +189,7 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
         // convolve with a bpsline3^-1 to make a cardinal post-filter
         for(int i=0; i<C; ++i)
-            recfilter5(preproc_img[i], img[i]);
+            recfilter5(plan->recfilter_plan, preproc_img[i], img[i]);
 
         if(timer)
             timer->stop();
@@ -212,7 +221,7 @@ void filter_free(filter_plan *plan)/*{{{*/
     cudaFreeArray(plan->a_in);
     delete plan;
 
-    recfilter5_free();
+    recfilter5_free(plan->recfilter_plan);
 }/*}}}*/
 
 template <effect_type OP,int C>
@@ -417,7 +426,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
 
         // convolve with a bpsline3^-1 to make a cardinal pre-filter
         for(int i=0; i<C; ++i)
-            recfilter5(out[i]);
+            recfilter5(plan->recfilter_plan, out[i]);
 
         if(timer)
             timer->stop();
