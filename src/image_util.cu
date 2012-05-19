@@ -167,7 +167,7 @@ void grayscale(dimage_ptr<float,1> out, dimage_ptr<const uchar3,1> in)
     out += idx;
 
     uchar3 p = *in;
-    *out = p.x/255.0f*0.2126f + p.y/255.0f*0.7152f + p.z/255.0f*0.0722f;
+    *out = grayscale(make_float3(p.x/255.0f, p.y/255.0f, p.z/255.0f));
 }
 
 __global__
@@ -187,8 +187,7 @@ void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float3,1> in)
     in += idx;
     out += idx;
 
-    float3 p = *in;
-    *out = p.x*0.2126f + p.y*0.7152f + p.z*0.0722f;
+    *out = grayscale(*in);
 }
 
 template <class T>
