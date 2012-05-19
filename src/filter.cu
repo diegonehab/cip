@@ -1,10 +1,12 @@
 #include <cutil.h>
 #include "filter.h"
+#include "timer.h"
 #include "effects.h"
 #include "symbol.h"
 #include "image_util.h"
 #include "blue_noise.h"
 #include "bspline3_sampler.h"
+#include "recfilter.h"
 
 #define USE_LAUNCH_BOUNDS 1
 const int BW_F1 = 32, // cuda block width
@@ -114,8 +116,11 @@ void init_blue_noise()/*{{{*/
 }/*}}}*/
 
 template<int C> 
-void init_filter(dimage_ptr<const float,C> img, const filter_operation &op)/*{{{*/
+void init_filter(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{*/
+                 int flags)
 {
+    assert(!img.empty());
+
     typedef filter_traits<C> cfg;
     typedef typename pixel_traits<float,C>::texel_type texel_type;
     typedef typename sum_traits<C>::type sum_type;
@@ -126,12 +131,48 @@ void init_filter(dimage_ptr<const float,C> img, const filter_operation &op)/*{{{
         cfg::a_in = NULL;
     }
 
+    cfg::flags = flags;
+
+    int imgsize = img.width()*img.height();
+
+    Vector<float,1+1> weights;
+
+    // calculate cubic b-spline weights
+    float a = 2.f-std::sqrt(3.0f);
+
+    weights[0] = 1+a;
+    weights[1] = a;
+
+    recfilter5_setup<1>(img.width(),img.height(),img.rowstride(),
+                        weights, CLAMP_TO_EDGE, 1);
+
+    base_timer *timer = NULL;
+
     // copy the input data to a texture
     cudaChannelFormatDesc ccd = cudaCreateChannelDesc<texel_type>();
 
-    cudaMallocArray(&cfg::a_in, &ccd, img.width(), img.height());
+    cudaMallocArray(&cfg::a_in, &ccd, img.width(),img.height());
 
-    cfg::copy_to_array(cfg::a_in, img);
+
+    if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        dimage<float,C> preproc_img(img.width(), img.height());
+
+        if(flags & VERBOSE)
+            timer = &timers.gpu_add("Convolve with bspline3^-1",
+                                    img.width()*img.height(), "P");
+
+        // convolve with a bpsline3^-1 to make a cardinal post-filter
+        for(int i=0; i<C; ++i)
+            recfilter5(preproc_img[i], img[i]);
+
+        if(timer)
+            timer->stop();
+
+        cfg::copy_to_array(cfg::a_in, &preproc_img);
+    }
+    else
+        cfg::copy_to_array(cfg::a_in, img);
 
     cfg::tex().normalized = false;
     cfg::tex().filterMode = cudaFilterModeLinear;
@@ -153,6 +194,7 @@ void destroy_filter()
     cfg::temp_image.reset();
     cudaFreeArray(cfg::a_in);
     cfg::a_in = NULL;
+    recfilter5_free();
 }
 
 template <effect_type OP,int C>
@@ -283,18 +325,24 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
 }/*}}}*/
 
 template <int C>
-void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
+void filter(dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
 {
     copy_to_symbol("filter_op",op);
 
     typedef filter_traits<C> cfg;
-    assert(cfg::temp_image.width() == img.width() &&
-           cfg::temp_image.height() == img.height());
+    assert(cfg::temp_image.width() == out.width() &&
+           cfg::temp_image.height() == out.height());
 
     cudaBindTextureToArray(cfg::tex(), cfg::a_in);
 
     dim3 bdim(BW_F1,BH_F1),
-         gdim((img.width()+bdim.x-1)/bdim.x, (img.height()+bdim.y-1)/bdim.y);
+         gdim((out.width()+bdim.x-1)/bdim.x, (out.height()+bdim.y-1)/bdim.y);
+
+    base_timer *timer = NULL;
+
+    if(cfg::flags & VERBOSE)
+        timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
+
 
 #define CASE(EFFECT) \
     case EFFECT:\
@@ -320,14 +368,41 @@ void filter(dimage_ptr<float,C> img, const filter_operation &op)/*{{{*/
         assert(false);
     }
 #undef CASE
+
+    if(timer)
+        timer->stop();
                    
     {
+        if(cfg::flags & VERBOSE)
+            timer = &timers.gpu_add("Second pass",out.width()*out.height(),"P");
+
         dim3 bdim(BW_F2,BH_F2),
-             gdim((img.width()+bdim.x-1)/bdim.x,(img.height()+bdim.y-1)/bdim.y);
-        filter_kernel2<C><<<gdim, bdim>>>(img, &cfg::temp_image);
+             gdim((out.width()+bdim.x-1)/bdim.x,(out.height()+bdim.y-1)/bdim.y);
+        filter_kernel2<C><<<gdim, bdim>>>(out, &cfg::temp_image);
+
+        if(timer)
+            timer->stop();
     }
 
     cudaUnbindTexture(cfg::tex());
+
+
+
+    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        if(cfg::flags & VERBOSE)
+            timer = &timers.gpu_add("Convolve with bspline3^-1",out.width()*out.height(),"P");
+
+        // convolve with a bpsline3^-1 to make a cardinal pre-filter
+        for(int i=0; i<C; ++i)
+            recfilter5(out[i]);
+
+        if(timer)
+            timer->stop();
+    }
+
+    // maps back to gamma space
+    lrgb2srgb(out, out);
 }/*}}}*/
 
 // Grayscale filtering ===================================================/*{{{*/
@@ -353,6 +428,8 @@ struct filter_traits<1>
     static dimage<sum_traits<1>::type,KS*KS> temp_image;
     static cudaArray *a_in;
 
+    static int flags;
+
     static 
     texture<float,2,cudaReadModeElementType> &tex() { return t_in_gray; }
 
@@ -372,12 +449,14 @@ struct filter_traits<1>
 
 dimage<sum_traits<1>::type,KS*KS> filter_traits<1>::temp_image;
 cudaArray *filter_traits<1>::a_in = NULL;
+int filter_traits<1>::flags = 0;
 
 template 
 void filter(dimage_ptr<float,1> img, const filter_operation &op);
 
 template 
-void init_filter(dimage_ptr<const float,1> img, const filter_operation &op);
+void init_filter(dimage_ptr<const float,1> img, const filter_operation &op, 
+                 int flags);
 
 template void destroy_filter<1>();
 /*}}}*/
@@ -407,6 +486,8 @@ struct filter_traits<3>
     static const int smem_size = 3;
 #endif
 
+    static int flags;
+
     static texture<float4,2,cudaReadModeElementType> &tex() 
         { return t_in_rgba; }
 
@@ -434,12 +515,14 @@ struct filter_traits<3>
 
 dimage<sum_traits<3>::type,KS*KS> filter_traits<3>::temp_image;
 cudaArray *filter_traits<3>::a_in = NULL;
+int filter_traits<3>::flags = 0;
 
 template 
 void filter(dimage_ptr<float,3> img, const filter_operation &op);
 
 template 
-void init_filter(dimage_ptr<const float,3> img, const filter_operation &op);
+void init_filter(dimage_ptr<const float,3> img, const filter_operation &op,
+                 int flags);
 
 template void destroy_filter<3>();
 /*}}}*/

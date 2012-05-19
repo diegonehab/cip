@@ -35,6 +35,12 @@ enum filter_type
     FILTER_CARDINAL_BSPLINE3
 };
 
+enum filter_flags
+{
+    VERBOSE=1
+};
+
+
 struct filter_operation
 {
     effect_type type;
@@ -88,7 +94,8 @@ struct filter_operation
 };
 
 template <int C> // C = number of channels
-void init_filter(dimage_ptr<const float,C> src_img, const filter_operation &op);
+void init_filter(dimage_ptr<const float,C> src_img, const filter_operation &op,
+                 int flags=0);
 
 template <int C> // C = number of channels
 void destroy_filter();

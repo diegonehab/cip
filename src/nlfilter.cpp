@@ -5,7 +5,6 @@
 #include <cuda_gl_interop.h>
 #include <getopt.h> // for getopt
 #include "image_util.h"
-#include "recfilter.h"
 #include "timer.h"
 #include "filter.h"
 #include "config.h"
@@ -188,11 +187,6 @@ filter_operation MainFrame::get_filter_operation() const
     return op;
 }
 
-// setup recursive filters and other stuff
-void setup_recursive_filter(int width, int height, int rowstride)
-{
-}
-
 void MainFrame::start_render_thread()
 {
     if(!m_render_thread.is_started())
@@ -214,97 +208,6 @@ void MainFrame::stop_render_thread()
     m_render_thread.join();
 }
 
-enum filter_flags
-{
-    VERBOSE=1
-};
-
-template <class T, class U, int C>
-void init_filter(dimage_ptr<T,C> out,
-                 dimage_ptr<U,C> in,
-                 const filter_operation &op)
-{
-    assert(!in.empty());
-    assert(!out.empty());
-
-    int imgsize = in.width()*in.height();
-
-    Vector<float,1+1> weights;
-
-    // calculate cubic b-spline weights
-    float a = 2.f-std::sqrt(3.0f);
-
-    weights[0] = 1+a;
-    weights[1] = a;
-
-    recfilter5_setup<1>(in.width(),in.height(),in.rowstride(),
-                                weights, CLAMP_TO_EDGE, 1);
-
-    if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
-    {
-        // convolve with a bpsline3^-1 to make a cardinal post-filter
-        for(int i=0; i<C; ++i)
-            recfilter5(out[i], in[i]);
-    }
-    else
-        out = in;
-
-    init_filter(dimage_ptr<const T,C>(out), op);
-}
-
-template <class T, class U, int C>
-void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
-                 const filter_operation &op,
-                 int flags=0)
-{
-    assert(!out.empty());
-    assert(!in.empty());
-
-    int imgsize = in.width()*in.height();
-
-    base_timer *timerzao = NULL, *timer = NULL;
-    if(flags & VERBOSE)
-        timerzao = &timers.gpu_add("Filter",imgsize,"P");
-
-    // do actual filtering
-    if(flags & VERBOSE)
-        timer = &timers.gpu_add("supersampling and transform",imgsize,"P");
-
-    out = in;
-
-    filter(out, op);
-
-    if(timer)
-        timer->stop();
-
-    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
-    {
-        // convolve with a bpsline3^-1 to make a cardinal pre-filter
-        if(flags & VERBOSE)
-            timer = &timers.gpu_add("bspline3^-1 convolution",imgsize,"P");
-
-        for(int i=0; i<C; ++i)
-            recfilter5(out[i]);
-
-        if(timer)
-            timer->stop();
-    }
-
-    // maps back to gamma space
-    if(flags & VERBOSE)
-        timer = &timers.gpu_add("linear to gamma",imgsize,"P");
-    lrgb2srgb(out, out);
-    if(flags & VERBOSE)
-        timer->stop();
-
-
-    if(timerzao)
-        timerzao->stop();
-
-    if(flags & VERBOSE)
-        timers.flush();
-}
-
 // defined on timer.cpp
 std::string unit_value(double v, double base);
 
@@ -319,29 +222,18 @@ void show_error(std::string *data)
 
 void *MainFrame::render_thread(MainFrame *frame)
 {
+    bool grayscale = frame->m_grayscale->value();
+
     try
     {
         ImageFrame *imgframe = frame->m_image_frame;
 
         filter_operation op = frame->get_filter_operation();
 
-        dimage<float,3> input_float3;
-        dimage<float> input_float;
-
-        if(frame->m_grayscale->value())
-        {
-            dimage_ptr<const float> input = imgframe->get_grayscale_input();
-            input_float.resize(input.width(), input.height());
-
-            init_filter(&input_float, input, op);
-        }
+        if(grayscale)
+            init_filter(imgframe->get_grayscale_input(), op);
         else
-        {
-            dimage_ptr<const float,3> input = imgframe->get_input();
-            input_float3.resize(input.width(), input.height());
-
-            init_filter(&input_float3, input, op);
-        }
+            init_filter(imgframe->get_input(), op);
 
         while(!frame->m_terminate_thread)
         {
@@ -371,10 +263,10 @@ void *MainFrame::render_thread(MainFrame *frame)
                 gpu_timer timer;
 
                 // just process one (grayscale) channel?
-                if(frame->m_grayscale->value())
-                    call_filter(imgframe->get_grayscale_output(), &input_float, op);
+                if(grayscale)
+                    filter(imgframe->get_grayscale_output(), op);
                 else
-                    call_filter(imgframe->get_output(), &input_float3, op);
+                    filter(imgframe->get_output(), op);
 
                 timer.stop();
 
@@ -424,9 +316,10 @@ void *MainFrame::render_thread(MainFrame *frame)
         Fl::awake((Fl_Awake_Handler)&show_error, new std::string("Render thread error: unknown"));
     }
 
-    destroy_filter<1>();
-    destroy_filter<3>();
-    recfilter5_free();
+    if(grayscale)
+        destroy_filter<1>();
+    else
+        destroy_filter<3>();
 }
 
 void MainFrame::on_change_grayscale(bool gs)
@@ -848,15 +741,26 @@ int main(int argc, char *argv[])
             dimage<uchar3,1> d_img;
             d_img.copy_from_host(imgdata, width, height);
 
+            base_timer *timerzao = &timers.gpu_add("Total Processing",
+                                                  width*height, "P", false),
+                       *timer = NULL;
+
             if(do_grayscale)
             {
                 dimage<float,1> d_gray;
                 d_gray.resize(d_img.width(), d_img.height());
                 grayscale(d_gray, &d_img);
 
-                init_filter(&d_gray, &d_gray, op);
+                timerzao->start();
 
-                call_filter(&d_gray, &d_gray, op, VERBOSE);
+                timer = &timers.gpu_add("Preprocessing", width*height, "P");
+                init_filter(dimage_ptr<const float,1>(&d_gray), op,
+                            VERBOSE);
+                timer->stop();
+
+                timer = &timers.gpu_add("Operation", width*height, "P");
+                filter(&d_gray, op);
+                timer->stop();
 
                 destroy_filter<1>();
 
@@ -869,18 +773,30 @@ int main(int argc, char *argv[])
 
                 convert(&d_channels, &d_img);
 
-                init_filter(&d_channels, &d_channels, op);
+                timerzao->start();
 
-                call_filter(&d_channels, &d_channels, op, VERBOSE);
+                timer = &timers.gpu_add("Preprocessing", width*height, "P");
+                init_filter(dimage_ptr<const float,3>(&d_channels), op,
+                            VERBOSE);
+                timer->stop();
+
+                timer = &timers.gpu_add("Operation", width*height, "P");
+                filter(&d_channels, op);
+                timer->stop();
 
                 destroy_filter<3>();
 
                 convert(&d_img, &d_channels);
             }
 
+            timerzao->stop();
+
             d_img.copy_to_host(imgdata);
 
             save_image(outfile, imgdata, width, height);
+
+            timers.flush();
+
             return 0;
         }
         else
