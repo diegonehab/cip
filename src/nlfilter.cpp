@@ -444,6 +444,7 @@ void MainFrame::on_postfilter_changed(Fl_Widget *,MainFrame *frame)
 {
     // must reprocess input image with new postfilter
     frame->restart_render_thread();
+    frame->update_image();
 }
 
 void MainFrame::open(const std::string &fname)
