@@ -87,9 +87,9 @@ public:
     ~timer_pool() { }
 
     gpu_timer &gpu_add(const std::string &label, size_t data_size=0,
-                       const std::string &unit="");
+                       const std::string &unit="", bool start=true);
     cpu_timer &cpu_add(const std::string &label, size_t data_size=0,
-                       const std::string &unit="");
+                       const std::string &unit="", bool start=true);
     void flush();
 
 private:

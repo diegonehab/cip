@@ -167,7 +167,7 @@ void scoped_timer_stop::stop()
 }
 
 gpu_timer &timer_pool::gpu_add(const std::string &label, size_t data_size,
-                               const std::string &unit)
+                               const std::string &unit, bool start)
 {
     gpu_timer *timer = new gpu_timer(data_size, unit, false);
 
@@ -178,12 +178,13 @@ gpu_timer &timer_pool::gpu_add(const std::string &label, size_t data_size,
 
     m_timers.push_back(data);
 
-    timer->start();
+    if(start)
+        timer->start();
     return *timer;
 }
 
 cpu_timer &timer_pool::cpu_add(const std::string &label, size_t data_size,
-                               const std::string &unit)
+                               const std::string &unit, bool start)
 {
     cpu_timer *timer = new cpu_timer(data_size, unit, false);
 
@@ -194,7 +195,8 @@ cpu_timer &timer_pool::cpu_add(const std::string &label, size_t data_size,
 
     m_timers.push_back(data);
 
-    timer->start();
+    if(start)
+        timer->start();
     return *timer;
 }
 
