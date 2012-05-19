@@ -41,7 +41,7 @@ recfilter5_plan_type<2> *plan_5_2 = NULL;
  *  @param[in] b1 Feedforward coefficient
  */
 template <int R>
-void recursive_filter_5(float *d_output, const float *d_input,
+void recfilter5(float *d_output, const float *d_input,
                         recfilter5_plan_type<R> &plan)
 {
     cudaMemcpy2DToArray(plan.a_in, 0, 0, d_input, plan.rowstride*sizeof(float),
@@ -81,23 +81,23 @@ void recursive_filter_5(float *d_output, const float *d_input,
     cudaUnbindTexture(t_in);
 }
 
-void recursive_filter_5(float *d_output, const float *d_input)
+void recfilter5(float *d_output, const float *d_input)
 {
     if(plan_5_1 != NULL)
-        recursive_filter_5(d_output, d_input, *plan_5_1);
+        recfilter5(d_output, d_input, *plan_5_1);
     else if(plan_5_2 != NULL)
-        recursive_filter_5(d_output, d_input, *plan_5_2);
+        recfilter5(d_output, d_input, *plan_5_2);
     else
         throw std::runtime_error("Recursive filter plan not configured!");
 }
 
-void recursive_filter_5(float *d_inout)
+void recfilter5(float *d_inout)
 {
-    recursive_filter_5(d_inout, d_inout);
+    recfilter5(d_inout, d_inout);
 }
 
 template <int R>
-void recursive_filter_5_setup(int width, int height, int rowstride,
+void recfilter5_setup(int width, int height, int rowstride,
                               const Vector<float, R+1> &w, 
                               BorderType border_type, int border,
                               recfilter5_plan_type<R> *&plan)
@@ -185,7 +185,7 @@ void recursive_filter_5_setup(int width, int height, int rowstride,
     }
 
     if(plan != NULL)
-        recursive_filter_5_free();
+        recfilter5_free();
 
     plan = new recfilter5_plan_type<R>();
 
@@ -212,24 +212,24 @@ void recursive_filter_5_setup(int width, int height, int rowstride,
 }
 
 template <>
-void recursive_filter_5_setup<1>(int width, int height, int rowstride,
+void recfilter5_setup<1>(int width, int height, int rowstride,
                               const Vector<float, 1+1> &w, 
                               BorderType border_type, int border)
 {
-    recursive_filter_5_setup(width, height, rowstride, w, border_type, border,
+    recfilter5_setup(width, height, rowstride, w, border_type, border,
                              plan_5_1);
 }
 
 template <>
-void recursive_filter_5_setup<2>(int width, int height, int rowstride,
+void recfilter5_setup<2>(int width, int height, int rowstride,
                               const Vector<float, 2+1> &w, 
                               BorderType border_type, int border)
 {
-    recursive_filter_5_setup(width, height, rowstride, w, border_type, border,
+    recfilter5_setup(width, height, rowstride, w, border_type, border,
                              plan_5_2);
 }
 
-void recursive_filter_5_free()
+void recfilter5_free()
 {
     if(plan_5_1)
     {

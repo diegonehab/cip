@@ -248,15 +248,15 @@ Matrix<T,R,N> tailT(const Matrix<T,M,N> &mat)
 
 typedef float pixel_type;
 template <int R>
-void recursive_filter_5_setup(int width, int height, int rowstride,
+void recfilter5_setup(int width, int height, int rowstride,
                               const Vector<float, R+1> &w,
                               BorderType border_type=CLAMP_TO_ZERO, 
                               int border=1);
-void recursive_filter_5_free();
+void recfilter5_free();
 
-void recursive_filter_5(float *d_inout);
+void recfilter5(float *d_inout);
 
-void recursive_filter_5(float *d_output,
+void recfilter5(float *d_output,
                         const float *d_input);
 
 #endif

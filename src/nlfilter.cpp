@@ -237,14 +237,14 @@ void init_filter(dimage_ptr<T,C> out,
     weights[0] = 1+a;
     weights[1] = a;
 
-    recursive_filter_5_setup<1>(in.width(),in.height(),in.rowstride(),
+    recfilter5_setup<1>(in.width(),in.height(),in.rowstride(),
                                 weights, CLAMP_TO_EDGE, 1);
 
     if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
     {
         // convolve with a bpsline3^-1 to make a cardinal post-filter
         for(int i=0; i<C; ++i)
-            recursive_filter_5(out[i], in[i]);
+            recfilter5(out[i], in[i]);
     }
     else
         out = in;
@@ -284,7 +284,7 @@ void call_filter(dimage_ptr<T,C> out, dimage_ptr<U,C> in,
             timer = &timers.gpu_add("bspline3^-1 convolution",imgsize,"P");
 
         for(int i=0; i<C; ++i)
-            recursive_filter_5(out[i]);
+            recfilter5(out[i]);
 
         if(timer)
             timer->stop();
@@ -426,7 +426,7 @@ void *MainFrame::render_thread(MainFrame *frame)
 
     destroy_filter<1>();
     destroy_filter<3>();
-    recursive_filter_5_free();
+    recfilter5_free();
 }
 
 void MainFrame::on_change_grayscale(bool gs)
