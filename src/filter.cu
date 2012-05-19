@@ -91,6 +91,22 @@ struct sum_traits
     typedef typename pixel_traits<float,C+1>::pixel_type type;
 };
 
+struct filter_plan
+{
+    virtual ~filter_plan() {}
+
+    int flags;
+    cudaArray *a_in;
+
+    filter_operation op;
+};
+
+template <int C>
+struct filter_plan_C : filter_plan
+{
+    dimage<typename sum_traits<C>::type,KS*KS> temp_image;
+};
+
 void init_blue_noise()/*{{{*/
 {
     std::vector<float2> blue_noise;
@@ -115,9 +131,13 @@ void init_blue_noise()/*{{{*/
     copy_to_symbol("bspline3_data",bspline3_data);
 }/*}}}*/
 
+template<int C>
+void copy_to_array(cudaArray *out, dimage_ptr<const float,C> in);
+
 template<int C> 
-void init_filter(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{*/
-                 int flags)
+filter_plan *
+filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{*/
+            int flags)
 {
     assert(!img.empty());
 
@@ -125,13 +145,10 @@ void init_filter(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{
     typedef typename pixel_traits<float,C>::texel_type texel_type;
     typedef typename sum_traits<C>::type sum_type;
 
-    if(cfg::a_in != NULL)
-    {
-        cudaFreeArray(cfg::a_in);
-        cfg::a_in = NULL;
-    }
+    filter_plan_C<C> *plan = new filter_plan_C<C>;
 
-    cfg::flags = flags;
+    plan->flags = flags;
+    plan->op = op;
 
     int imgsize = img.width()*img.height();
 
@@ -151,8 +168,7 @@ void init_filter(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{
     // copy the input data to a texture
     cudaChannelFormatDesc ccd = cudaCreateChannelDesc<texel_type>();
 
-    cudaMallocArray(&cfg::a_in, &ccd, img.width(),img.height());
-
+    cudaMallocArray(&plan->a_in, &ccd, img.width(),img.height());
 
     if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
     {
@@ -169,10 +185,10 @@ void init_filter(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{
         if(timer)
             timer->stop();
 
-        cfg::copy_to_array(cfg::a_in, &preproc_img);
+        copy_to_array(plan->a_in, dimage_ptr<const float,C>(&preproc_img));
     }
     else
-        cfg::copy_to_array(cfg::a_in, img);
+        copy_to_array(plan->a_in, img);
 
     cfg::tex().normalized = false;
     cfg::tex().filterMode = cudaFilterModeLinear;
@@ -181,21 +197,23 @@ void init_filter(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{
 
     copy_to_symbol("filter_op",op);
 
-    cfg::temp_image.resize(img.width(), img.height());
+    plan->temp_image.resize(img.width(), img.height());
 
     init_blue_noise();
+
+    return plan;
 }/*}}}*/
 
-template<int C> 
-void destroy_filter()
+void filter_free(filter_plan *plan)/*{{{*/
 {
-    typedef filter_traits<C> cfg;
+    if(plan == NULL)
+        return;
 
-    cfg::temp_image.reset();
-    cudaFreeArray(cfg::a_in);
-    cfg::a_in = NULL;
+    cudaFreeArray(plan->a_in);
+    delete plan;
+
     recfilter5_free();
-}
+}/*}}}*/
 
 template <effect_type OP,int C>
 __global__
@@ -325,28 +343,34 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
 }/*}}}*/
 
 template <int C>
-void filter(dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
+void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
 {
+    filter_plan_C<C> *plan = dynamic_cast<filter_plan_C<C> *>(_plan);
+    assert(plan != NULL);
+
+    if(plan->op.post_filter != op.post_filter)
+        throw std::runtime_error("Postfilter changed, plan must be recreated");
+
     copy_to_symbol("filter_op",op);
 
     typedef filter_traits<C> cfg;
-    assert(cfg::temp_image.width() == out.width() &&
-           cfg::temp_image.height() == out.height());
+    assert(plan->temp_image.width() == out.width() &&
+           plan->temp_image.height() == out.height());
 
-    cudaBindTextureToArray(cfg::tex(), cfg::a_in);
+    cudaBindTextureToArray(cfg::tex(), plan->a_in);
 
     dim3 bdim(BW_F1,BH_F1),
          gdim((out.width()+bdim.x-1)/bdim.x, (out.height()+bdim.y-1)/bdim.y);
 
     base_timer *timer = NULL;
 
-    if(cfg::flags & VERBOSE)
+    if(plan->flags & VERBOSE)
         timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
 
 
 #define CASE(EFFECT) \
     case EFFECT:\
-        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&cfg::temp_image); \
+        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
         break
 
     switch(op.type)
@@ -373,12 +397,12 @@ void filter(dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
         timer->stop();
                    
     {
-        if(cfg::flags & VERBOSE)
+        if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("Second pass",out.width()*out.height(),"P");
 
         dim3 bdim(BW_F2,BH_F2),
              gdim((out.width()+bdim.x-1)/bdim.x,(out.height()+bdim.y-1)/bdim.y);
-        filter_kernel2<C><<<gdim, bdim>>>(out, &cfg::temp_image);
+        filter_kernel2<C><<<gdim, bdim>>>(out, &plan->temp_image);
 
         if(timer)
             timer->stop();
@@ -386,11 +410,9 @@ void filter(dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
 
     cudaUnbindTexture(cfg::tex());
 
-
-
     if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
     {
-        if(cfg::flags & VERBOSE)
+        if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("Convolve with bspline3^-1",out.width()*out.height(),"P");
 
         // convolve with a bpsline3^-1 to make a cardinal pre-filter
@@ -425,21 +447,8 @@ struct filter_traits<1>
     typedef texfetch_gray texfetch_type;
     static const int smem_size = 3;
 
-    static dimage<sum_traits<1>::type,KS*KS> temp_image;
-    static cudaArray *a_in;
-
-    static int flags;
-
     static 
     texture<float,2,cudaReadModeElementType> &tex() { return t_in_gray; }
-
-    static void copy_to_array(cudaArray *out, dimage_ptr<const float> in)
-    {
-        cudaMemcpy2DToArray(out, 0, 0, in, 
-                            in.rowstride()*sizeof(float),
-                            in.width()*sizeof(float), in.height(),
-                            cudaMemcpyDeviceToDevice);
-    }
 
     __device__ static float normalize_sum(float2 sum)
     {
@@ -447,18 +456,22 @@ struct filter_traits<1>
     }
 };
 
-dimage<sum_traits<1>::type,KS*KS> filter_traits<1>::temp_image;
-cudaArray *filter_traits<1>::a_in = NULL;
-int filter_traits<1>::flags = 0;
+template<>
+void copy_to_array(cudaArray *out, dimage_ptr<const float> in)
+{
+    cudaMemcpy2DToArray(out, 0, 0, in, 
+                        in.rowstride()*sizeof(float),
+                        in.width()*sizeof(float), in.height(),
+                        cudaMemcpyDeviceToDevice);
+}
 
 template 
-void filter(dimage_ptr<float,1> img, const filter_operation &op);
+void filter(filter_plan *, dimage_ptr<float,1> img, const filter_operation &op);
 
 template 
-void init_filter(dimage_ptr<const float,1> img, const filter_operation &op, 
-                 int flags);
-
-template void destroy_filter<1>();
+filter_plan *
+filter_create_plan(dimage_ptr<const float,1> img, const filter_operation &op, 
+                   int flags);
 /*}}}*/
 
 //{{{ RGB filtering =========================================================
@@ -491,38 +504,30 @@ struct filter_traits<3>
     static texture<float4,2,cudaReadModeElementType> &tex() 
         { return t_in_rgba; }
 
-    static cudaArray *a_in;
-
-    static dimage<sum_traits<3>::type,KS*KS> temp_image;
-
-    static void copy_to_array(cudaArray *out, dimage_ptr<const float,3> img)
-    {
-        dimage<float3> temp;
-        temp.resize(img.width(), img.height());
-        convert(&temp, img);
-
-        cudaMemcpy2DToArray(out, 0, 0, temp, 
-                            temp.rowstride()*sizeof(float4),
-                            temp.width()*sizeof(float4), temp.height(),
-                            cudaMemcpyDeviceToDevice);
-    }
-
     __device__ static float3 normalize_sum(float4 sum)
     {
         return make_float3(sum) / sum.w;
     }
 };
 
-dimage<sum_traits<3>::type,KS*KS> filter_traits<3>::temp_image;
-cudaArray *filter_traits<3>::a_in = NULL;
-int filter_traits<3>::flags = 0;
+template <>
+void copy_to_array(cudaArray *out, dimage_ptr<const float,3> img)
+{
+    dimage<float3> temp;
+    temp.resize(img.width(), img.height());
+    convert(&temp, img);
+
+    cudaMemcpy2DToArray(out, 0, 0, temp, 
+                        temp.rowstride()*sizeof(float4),
+                        temp.width()*sizeof(float4), temp.height(),
+                        cudaMemcpyDeviceToDevice);
+}
 
 template 
-void filter(dimage_ptr<float,3> img, const filter_operation &op);
+void filter(filter_plan *, dimage_ptr<float,3> img, const filter_operation &op);
 
 template 
-void init_filter(dimage_ptr<const float,3> img, const filter_operation &op,
-                 int flags);
-
-template void destroy_filter<3>();
+filter_plan *
+filter_create_plan(dimage_ptr<const float,3> img, const filter_operation &op, 
+                   int flags);
 /*}}}*/

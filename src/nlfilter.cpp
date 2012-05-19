@@ -222,7 +222,7 @@ void show_error(std::string *data)
 
 void *MainFrame::render_thread(MainFrame *frame)
 {
-    bool grayscale = frame->m_grayscale->value();
+    filter_plan *plan = NULL;
 
     try
     {
@@ -230,10 +230,12 @@ void *MainFrame::render_thread(MainFrame *frame)
 
         filter_operation op = frame->get_filter_operation();
 
+        bool grayscale = frame->m_grayscale->value();
+
         if(grayscale)
-            init_filter(imgframe->get_grayscale_input(), op);
+            plan = filter_create_plan(imgframe->get_grayscale_input(), op);
         else
-            init_filter(imgframe->get_input(), op);
+            plan = filter_create_plan(imgframe->get_input(), op);
 
         while(!frame->m_terminate_thread)
         {
@@ -264,9 +266,9 @@ void *MainFrame::render_thread(MainFrame *frame)
 
                 // just process one (grayscale) channel?
                 if(grayscale)
-                    filter(imgframe->get_grayscale_output(), op);
+                    filter(plan, imgframe->get_grayscale_output(), op);
                 else
-                    filter(imgframe->get_output(), op);
+                    filter(plan, imgframe->get_output(), op);
 
                 timer.stop();
 
@@ -316,10 +318,7 @@ void *MainFrame::render_thread(MainFrame *frame)
         Fl::awake((Fl_Awake_Handler)&show_error, new std::string("Render thread error: unknown"));
     }
 
-    if(grayscale)
-        destroy_filter<1>();
-    else
-        destroy_filter<3>();
+    filter_free(plan);
 }
 
 void MainFrame::on_change_grayscale(bool gs)
@@ -754,15 +753,16 @@ int main(int argc, char *argv[])
                 timerzao->start();
 
                 timer = &timers.gpu_add("Preprocessing", width*height, "P");
-                init_filter(dimage_ptr<const float,1>(&d_gray), op,
+                filter_plan *plan
+                    = filter_create_plan(dimage_ptr<const float,1>(&d_gray), op,
                             VERBOSE);
                 timer->stop();
 
                 timer = &timers.gpu_add("Operation", width*height, "P");
-                filter(&d_gray, op);
+                filter(plan, &d_gray, op);
                 timer->stop();
 
-                destroy_filter<1>();
+                filter_free(plan);
 
                 convert(&d_img, &d_gray);
             }
@@ -776,15 +776,16 @@ int main(int argc, char *argv[])
                 timerzao->start();
 
                 timer = &timers.gpu_add("Preprocessing", width*height, "P");
-                init_filter(dimage_ptr<const float,3>(&d_channels), op,
+                filter_plan *plan
+                    = filter_create_plan(dimage_ptr<const float,3>(&d_channels), op,
                             VERBOSE);
                 timer->stop();
 
                 timer = &timers.gpu_add("Operation", width*height, "P");
-                filter(&d_channels, op);
+                filter(plan, &d_channels, op);
                 timer->stop();
 
-                destroy_filter<3>();
+                filter_free(plan);
 
                 convert(&d_img, &d_channels);
             }
