@@ -279,7 +279,7 @@ recfilter5_create_plan<2>(int width, int height, int rowstride,
                           const Vector<float, 2+1> &w, 
                           BorderType border_type, int border);
 
-void recfilter5_free(recfilter5_plan *plan)
+void free(recfilter5_plan *plan)
 {
     if(g_loaded_plan_in_gpu == plan)
         g_loaded_plan_in_gpu = NULL;

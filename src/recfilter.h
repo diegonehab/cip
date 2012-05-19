@@ -254,7 +254,7 @@ recfilter5_plan *recfilter5_create_plan(int width, int height, int rowstride,
                                         const Vector<float, R+1> &w,
                                         BorderType border_type=CLAMP_TO_ZERO, 
                                         int border=1);
-void recfilter5_free(recfilter5_plan *plan);
+void free(recfilter5_plan *plan);
 
 void recfilter5(recfilter5_plan *plan, float *d_inout);
 void recfilter5(recfilter5_plan *plan, float *d_output, const float *d_input);

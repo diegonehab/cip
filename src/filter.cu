@@ -101,7 +101,7 @@ struct filter_plan
 
     virtual ~filter_plan()
     {
-        recfilter5_free(prefilter_recfilter_plan);
+        free(prefilter_recfilter_plan);
 
         if(a_in)
             cudaFreeArray(a_in);
@@ -204,11 +204,11 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
             copy_to_array(plan->a_in, dimage_ptr<const float,C>(&preproc_img));
 
-            recfilter5_free(postfilter_plan);
+            free(postfilter_plan);
         }
         catch(...)
         {
-            recfilter5_free(postfilter_plan);
+            free(postfilter_plan);
             throw;
         }
     }
