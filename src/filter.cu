@@ -437,13 +437,13 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
 
     base_timer *timer = NULL;
 
-    if(plan->flags & VERBOSE)
-        timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
-
-
 #define CASE(EFFECT) \
     case EFFECT:\
+        if(plan->flags & VERBOSE)\
+            timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");\
         filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+        if(timer)\
+            timer->stop();\
         break
 
     switch(op.type)
@@ -464,12 +464,23 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     case EFFECT_UNSHARP_MASK:
         assert(plan->a_aux_float != NULL);
 
+        if(plan->flags & VERBOSE)
+            timer = &timers.gpu_add("Gaussian blur on Y channel",out.width()*out.height(),"P");
+
         gaussian_blur(&plan->img_aux_float, &plan->img_aux_float_orig, op.sigma);
+        if(timer)
+            timer->stop();
 
         copy_to_array(plan->a_aux_float, dimage_ptr<const float>(&plan->img_aux_float));
         cudaBindTextureToArray(t_aux_float, plan->a_aux_float);
 
+        if(plan->flags & VERBOSE)
+            timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
+
         filter_kernel1<EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+
+        if(timer)
+            timer->stop();
 
         cudaUnbindTexture(t_aux_float);
         break;
@@ -477,9 +488,6 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         assert(false);
     }
 #undef CASE
-
-    if(timer)
-        timer->stop();
                    
     {
         if(plan->flags & VERBOSE)
