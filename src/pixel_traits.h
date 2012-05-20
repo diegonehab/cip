@@ -109,6 +109,8 @@ namespace detail
         typedef typename make_cuda_type<T,C>::type pixel_type;
         typedef typename cuda_traits<pixel_type>::texel_type texel_type;
         typedef typename cuda_traits<T>::base_type base_type;
+        
+        static const int components = cuda_traits<pixel_type>::components;
 
         static const bool is_integral = ::is_integral<base_type>::value;
     };
