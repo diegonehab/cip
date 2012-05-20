@@ -99,8 +99,13 @@ void save_image(const std::string &fname, const std::vector<uchar4> &data,
 void save_image(const std::string &fname, const std::vector<unsigned char> &data,
                  int width, int height);
 
-void save_image(const std::string &fname, dimage_ptr<const uchar3> img);
-void save_image(const std::string &fname, dimage_ptr<const unsigned char,3> img);
-void save_image(const std::string &fname, dimage_ptr<const unsigned char> img);
+template <class T, int C>
+void save_image(const std::string &fname, dimage_ptr<const T,C> img);
+
+template <class T, int C>
+void save_image(const std::string &fname, dimage_ptr<T,C> img)
+{
+    save_image(fname, dimage_ptr<const T,C>(img));
+}
 
 #endif
