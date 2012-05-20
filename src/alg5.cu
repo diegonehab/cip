@@ -23,6 +23,7 @@
 
 #include "symbol.h"
 #include "dvector.h"
+#include "util.h"
 
 #include "recfilter.h"
 #include "image.h"
@@ -63,12 +64,7 @@ parameter; f_ surface.
 
 */
 
-// from boost::preprocessor
-
-#define BOOST_PP_CAT(a, b) BOOST_PP_CAT_I(a, b)
-#define BOOST_PP_CAT_I(a, b) a ## b
-
-#define PREFIX(x) BOOST_PP_CAT(BOOST_PP_CAT(c5_, ORDER),_##x)
+#define PREFIX(x) PP_CAT3(c5_, ORDER,_##x)
 
 #define c_weights PREFIX(weights)
 #define c_AbF_T PREFIX(AbF_T)

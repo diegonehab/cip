@@ -165,5 +165,12 @@ struct is_integral
 };
 
 
+// from boost::preprocessor
+// concatenate expanded arguments
+
+#define PP_CAT(a, b) PP_CAT_I(a, b)
+#define PP_CAT_I(a, b) a ## b
+
+#define PP_CAT3(a, b, c) PP_CAT(a,PP_CAT(b,c))
 
 #endif
