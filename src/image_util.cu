@@ -625,49 +625,88 @@ namespace
 
 }
 
-
-template <int C>
-void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<const float,C> in,
-                   float sigma)
+struct gaussian_blur_plan
 {
-    recfilter5_plan *plan = NULL;
+    gaussian_blur_plan() : plan1(NULL), plan2(NULL) {}
+    ~gaussian_blur_plan()
+    {
+        free(plan1);
+        free(plan2);
+    }
 
+    recfilter5_plan *plan1, *plan2;
+};
+
+gaussian_blur_plan *gaussian_blur_create_plan(int width, int height,
+                                              int rowstride, float sigma)
+{
+    gaussian_blur_plan *plan = new gaussian_blur_plan();
     try
     {
-        Vector<float,1+1> weights1;
-        gaussian_weights1(sigma,weights1);
+        update_plan(plan, width, height, rowstride, sigma);
 
-        plan = recfilter5_create_plan<1>(in.width(), in.height(), 
-                                         in.rowstride(), weights1);
-
-        for(int i=0; i<C; ++i)
-            recfilter5(plan, out[i], in[i]);
-
-        free(plan);
-
-        Vector<float,1+2> weights2;
-        gaussian_weights2(sigma,weights2);
-        plan = recfilter5_create_plan<2>(in.width(), in.height(), 
-                                         in.rowstride(), weights2);
-
-        for(int i=0; i<C; ++i)
-            recfilter5(plan, out[i]);
-
-        free(plan);
+        return plan;
     }
     catch(...)
     {
-        free(plan);
-        throw;;
+        delete plan;
+        throw;
     }
 }
 
-template
-void gaussian_blur(dimage_ptr<float> out, dimage_ptr<const float> in, 
-                   float sigma);
+void free(gaussian_blur_plan *plan)
+{
+    delete plan;
+}
+
+void update_plan(gaussian_blur_plan *plan, int width, int height, 
+                 int rowstride, float sigma)
+{
+    // TODO: must have strong exception guarantee!
+
+    Vector<float,1+1> weights1;
+    gaussian_weights1(sigma,weights1);
+
+    if(plan->plan1 == NULL)
+    {
+        plan->plan1 = recfilter5_create_plan<1>(width, height, 
+                                                rowstride, weights1);
+    }
+    else
+        update_plan<1>(plan->plan1, width, height, rowstride, weights1);
+
+    Vector<float,1+2> weights2;
+    gaussian_weights2(sigma,weights2);
+
+    if(plan->plan2 == NULL)
+    {
+        plan->plan2 = recfilter5_create_plan<2>(width, height, 
+                                                rowstride, weights2);
+    }
+    else
+        update_plan<2>(plan->plan2, width, height, rowstride, weights2);
+
+}
+
+template <int C>
+void gaussian_blur(gaussian_blur_plan *plan, dimage_ptr<float, C> out, 
+                   dimage_ptr<const float,C> in)
+{
+    assert(plan != NULL);
+
+    for(int i=0; i<C; ++i)
+        recfilter5(plan->plan1, out[i], in[i]);
+
+    for(int i=0; i<C; ++i)
+        recfilter5(plan->plan2, out[i]);
+}
 
 template
-void gaussian_blur(dimage_ptr<float,3> out, dimage_ptr<const float,3> in, 
-                   float sigma);
+void gaussian_blur(gaussian_blur_plan *plan, dimage_ptr<float> out, 
+                   dimage_ptr<const float> in);
+
+template
+void gaussian_blur(gaussian_blur_plan *plan, dimage_ptr<float,3> out, 
+                   dimage_ptr<const float,3> in);
 
 /*}}}*/

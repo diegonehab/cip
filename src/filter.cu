@@ -114,6 +114,7 @@ struct filter_plan
         : a_in(NULL)
         , a_aux_float(NULL)
         , prefilter_recfilter_plan(NULL)
+        , gaussblur_plan(NULL)
     {
     }
 
@@ -126,6 +127,8 @@ struct filter_plan
 
         if(a_aux_float)
             cudaFreeArray(a_aux_float);
+
+        free(gaussblur_plan);
     }
 
     int flags;
@@ -136,6 +139,8 @@ struct filter_plan
     filter_operation op;
 
     recfilter5_plan *prefilter_recfilter_plan;
+
+    gaussian_blur_plan *gaussblur_plan;
 };
 
 template <int C>
@@ -269,6 +274,10 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
         plan->img_aux_float_orig.resize(img.width(), img.height());
         luminance(&plan->img_aux_float_orig, &preproc_img);
+
+        plan->gaussblur_plan 
+            = gaussian_blur_create_plan(img.width(), img.height(), 
+                                        img.rowstride(), op.sigma);
 
         plan->img_aux_float.resize(img.width(), img.height());
 
@@ -467,7 +476,14 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("Gaussian blur on Y channel",out.width()*out.height(),"P");
 
-        gaussian_blur(&plan->img_aux_float, &plan->img_aux_float_orig, op.sigma);
+        update_plan(plan->gaussblur_plan, 
+                    plan->img_aux_float_orig.width(),
+                    plan->img_aux_float_orig.height(),
+                    plan->img_aux_float_orig.rowstride(),
+                    op.sigma);
+
+        gaussian_blur(plan->gaussblur_plan, &plan->img_aux_float, 
+                      &plan->img_aux_float_orig);
         if(timer)
             timer->stop();
 

@@ -71,21 +71,30 @@ void luminance(dimage_ptr<float> out, dimage_ptr<T,C> in)
 
 // gaussian blur ------------------------------------------
 
-template <int C>
-void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<const float,C> in,
-                   float sigma);
+struct gaussian_blur_plan;
+
+gaussian_blur_plan *gaussian_blur_create_plan(int width, int height,
+                                              int rowstride, float sigma);
+void free(gaussian_blur_plan *);
+
+void update_plan(gaussian_blur_plan *plan, int width, int height, 
+                 int rowstride, float sigma);
 
 template <int C>
-void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<float,C> in,
-                   float sigma)
+void gaussian_blur(gaussian_blur_plan *plan, dimage_ptr<float, C> out, 
+                   dimage_ptr<const float,C> in);
+
+template <int C>
+void gaussian_blur(gaussian_blur_plan *plan, dimage_ptr<float, C> out, 
+                   dimage_ptr<float,C> in)
 {
-    gaussian_blur(out, dimage_ptr<const float,C>(in), sigma);
+    gaussian_blur(plan, out, dimage_ptr<const float,C>(in));
 }
 
 template <int C>
-void gaussian_blur(dimage_ptr<float, C> out, float sigma)
+void gaussian_blur(gaussian_blur_plan *plan, dimage_ptr<float, C> out)
 {
-    gaussian_blur( out, dimage_ptr<const float,C>(out), sigma);
+    gaussian_blur(plan, out, dimage_ptr<const float,C>(out));
 }
 
 // I/O ----------------------------
