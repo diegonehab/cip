@@ -12,7 +12,15 @@ const int WS = 32;
 
 struct recfilter5_plan
 {
-    recfilter5_plan() : a_in(NULL) {}
+    recfilter5_plan() 
+        // at least these should be initialized to make
+        // upload_plan work when plan is empty
+        : a_in(NULL)
+        , width(0)
+        , height(0)
+        , border(0)
+    {
+    }
 
     virtual ~recfilter5_plan()
     {
@@ -33,6 +41,13 @@ struct recfilter5_plan
 template <int R>
 struct recfilter5_plan_R : recfilter5_plan
 {
+    recfilter5_plan_R()
+    {
+        // this should be initialized for upload_plan
+        for(int i=0; i<R; ++i)
+            weights[i] = 0;
+    }
+
     dvector<Matrix<float,R,WS> > d_pybar,
                                  d_ezhat,
                                  d_ptucheck,
@@ -197,11 +212,70 @@ recfilter5_create_plan(int width, int height, int rowstride,
                        const Vector<float, R+1> &w, 
                        BorderType border_type, int border)
 {
+    recfilter5_plan_R<R> *plan = new recfilter5_plan_R<R>;
+    try
+    {
+        update_plan<R>(plan, width, height, rowstride, w, border_type, border);
+
+        load_plan(*plan);
+    }
+    catch(...)
+    {
+        delete plan;
+        throw;
+    }
+
+    return plan;
+}
+
+template <int R>
+void update_plan(recfilter5_plan *_plan, int width, int height, int rowstride,
+                 const Vector<float, R+1> &w,
+                 BorderType border_type, int border)
+{
+    assert(_plan);
+
+    recfilter5_plan_R<R> *plan = dynamic_cast<recfilter5_plan_R<R> *>(_plan);
+    if(plan == NULL)
+        throw std::invalid_argument("Can't change recfilter's plan order");
+
     const int B = 32;
 
-    recfilter5_plan_R<R> *plan = new recfilter5_plan_R<R>;
 
-    try
+    int old_border = plan->border,
+        old_width = plan->width,
+        old_height = plan->height;
+
+    if(old_width!=width || old_height!=height)
+    {
+        // let's do this first to at least have a passable strong
+        // exception guarantee (this has more chance to blow up)
+
+        cudaArray *a_in = NULL;
+
+        cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float>();
+        cudaMallocArray(&a_in, &ccd, width, height);
+        check_cuda_error("cudaMallocArray");
+
+        try
+        {
+            if(plan->a_in)
+            {
+                cudaFreeArray(plan->a_in);
+                check_cuda_error("cudaFreeArray");
+                plan->a_in = NULL;
+            }
+        }
+        catch(...)
+        {
+            cudaFreeArray(a_in);
+            throw;
+        }
+
+        plan->a_in = a_in;
+    }
+
+    if(plan->weights != w)
     {
         Matrix<float,R,R> Ir = identity<float,R,R>();
         Matrix<float,B,R> Zbr = zeros<float,B,R>();
@@ -224,48 +298,50 @@ recfilter5_create_plan(int width, int height, int rowstride,
         plan->ARB_AFP_T = plan->AFP_T*plan->ARB_T;
         plan->TAFB = transp(tail<R>(plan->AFB_T));
         plan->HARB_AFB = transp(plan->AFB_T*head<R>(plan->ARB_T));
+    }
 
-        int bleft, bright, btop, bbottom;
-        calc_borders(&bleft, &btop, &bright, &bbottom, width, height, border);
+    int bleft, bright, btop, bbottom;
+    calc_borders(&bleft, &btop, &bright, &bbottom, width, height, border);
 
-        // depends on width and border
+    // depends on width and border
+    if(old_border != border || old_width != width)
+    {
         plan->m_size = (width+bleft+bright+WS-1)/WS,
         plan->last_m = (bleft+width-1)/WS;
         plan->width = width;
         plan->inv_width = 1.f/width;
+    }
 
-        // depends on height and border
+    // depends on height and border
+    if(old_border != border || old_height != height)
+    {
         plan->n_size = (height+btop+bbottom+WS-1)/WS;
         plan->last_n = (btop+height-1)/WS;
         plan->height = height;
         plan->inv_height = 1.f/height;
+    }
 
-        // depends on rowstride
-        plan->rowstride = rowstride;
+    // depends on width, height and border
+    if(old_border!=border || old_width!=width || old_height!=height)
+    {
+        // TODO: provide strong exception guarantee of previous data
+        // in case of any of these blowing up.
 
-        // depends on border
-        plan->border_type = border_type;
-        plan->border = border;
-
-        // depends on width, height and border
         plan->d_pybar.resize(plan->n_size*plan->m_size);
         plan->d_ezhat.resize(plan->n_size*plan->m_size);
         plan->d_ptucheck.resize(plan->n_size*plan->m_size);
         plan->d_etvtilde.resize(plan->n_size*plan->m_size);
-
-        cudaChannelFormatDesc ccd = cudaCreateChannelDesc<float>();
-        cudaMallocArray(&plan->a_in, &ccd, width, height);
-
-        load_plan(*plan);
-    }
-    catch(...)
-    {
-        delete plan;
-        throw;
     }
 
-    return plan;
+
+    // depends on rowstride
+    plan->rowstride = rowstride;
+
+    // depends on border
+    plan->border_type = border_type;
+    plan->border = border;
 }
+
 
 template
 recfilter5_plan *

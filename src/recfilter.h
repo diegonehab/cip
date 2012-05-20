@@ -254,6 +254,12 @@ recfilter5_plan *recfilter5_create_plan(int width, int height, int rowstride,
                                         const Vector<float, R+1> &w,
                                         BorderType border_type=REFLECT, 
                                         int border=1);
+
+template <int R>
+void update_plan(recfilter5_plan *plan, int width, int height, int rowstride,
+                 const Vector<float, R+1> &w,
+                 BorderType border_type=REFLECT, int border=1);
+
 void free(recfilter5_plan *plan);
 
 void recfilter5(recfilter5_plan *plan, float *d_inout);
