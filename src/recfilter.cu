@@ -81,27 +81,27 @@ void load_plan(const recfilter5_plan_R<R> &plan)
     }
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->border != plan.border)
-        copy_to_symbol(prefix+"border",plan.border);
+        copy_to_symbol("c_border",plan.border);
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->rowstride!=plan.rowstride)
-        copy_to_symbol(prefix+"rowstride", plan.rowstride);
+        copy_to_symbol("c_rowstride", plan.rowstride);
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->width != plan.width
        || g_loaded_plan_in_gpu->border != plan.border)
     {
-        copy_to_symbol(prefix+"width", plan.width); 
-        copy_to_symbol(prefix+"inv_width", plan.inv_width); 
-        copy_to_symbol(prefix+"m_size", plan.m_size); 
-        copy_to_symbol(prefix+"last_m", plan.last_m); 
+        copy_to_symbol("c_width", plan.width); 
+        copy_to_symbol("c_inv_width", plan.inv_width); 
+        copy_to_symbol("c_m_size", plan.m_size); 
+        copy_to_symbol("c_last_m", plan.last_m); 
     }
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->height != plan.height
        || g_loaded_plan_in_gpu->border != plan.border)
     {
-        copy_to_symbol(prefix+"inv_height", plan.inv_height);
-        copy_to_symbol(prefix+"height", plan.height);
-        copy_to_symbol(prefix+"n_size", plan.n_size);
-        copy_to_symbol(prefix+"last_n", plan.last_n);
+        copy_to_symbol("c_inv_height", plan.inv_height);
+        copy_to_symbol("c_height", plan.height);
+        copy_to_symbol("c_n_size", plan.n_size);
+        copy_to_symbol("c_last_n", plan.last_n);
     }
 
     if(!g_loaded_plan_in_gpu)

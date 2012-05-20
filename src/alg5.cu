@@ -70,18 +70,6 @@ parameter; f_ surface.
 
 #define PREFIX(x) BOOST_PP_CAT(BOOST_PP_CAT(c5_, ORDER),_##x)
 
-#define c_width PREFIX(width)
-#define c_height PREFIX(height)
-#define c_rowstride PREFIX(rowstride)
-#define c_adj_width PREFIX(adj_width)
-#define c_adj_height PREFIX(adj_height)
-#define c_m_size PREFIX(m_size)
-#define c_n_size PREFIX(n_size)
-#define c_last_m PREFIX(last_m)
-#define c_last_n PREFIX(last_n)
-#define c_border PREFIX(border)
-#define c_inv_width PREFIX(inv_width)
-#define c_inv_height PREFIX(inv_height)
 #define c_weights PREFIX(weights)
 #define c_AbF_T PREFIX(AbF_T)
 #define c_AbR_T PREFIX(AbR_T)
@@ -94,6 +82,8 @@ parameter; f_ surface.
 #define c_TAFB PREFIX(TAFB)
 #define c_ARB_AFP_T PREFIX(ARB_AFP_T)
 
+#ifndef NON_ORDER_DEPENDENT_PARAMETERS_DEFINED
+#define NON_ORDER_DEPENDENT_PARAMETERS_DEFINED 1
 __constant__ int c_width, c_height, c_rowstride,
                  c_adj_width, c_adj_height,
                  c_m_size, // number of column-blocks,
@@ -101,6 +91,7 @@ __constant__ int c_width, c_height, c_rowstride,
                  c_last_m, c_last_n,
                  c_border;
 __constant__ float c_inv_width, c_inv_height;
+#endif
 
 __constant__ Vector<float,ORDER+1> c_weights;
 
