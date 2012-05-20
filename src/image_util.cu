@@ -108,7 +108,7 @@ template void convert(dimage_ptr<float,3> out, dimage_ptr<const float> in);
 template void convert(dimage_ptr<uchar3> out, dimage_ptr<const float> in);
 /*}}}*/
 
-// lrgb2srgb ------------------------------------------------------------
+//{{{ lrgb2srgb ------------------------------------------------------------
 
 template <class TO, class FROM>
 struct lrgb2srgb_xform
@@ -129,8 +129,9 @@ template void lrgb2srgb(dimage_ptr<float3> out, dimage_ptr<const float3> in);
 template void lrgb2srgb(dimage_ptr<float3> out, dimage_ptr<const float,3> in);
 template void lrgb2srgb(dimage_ptr<float,3> out, dimage_ptr<const float,3> in);
 template void lrgb2srgb(dimage_ptr<float> out, dimage_ptr<const float> in);
+/*}}}*/
 
-// grayscale ------------------------------------------------------------
+//{{{ grayscale ------------------------------------------------------------
 
 template <class FROM, class EN=void>
 struct grayscale_xform_base
@@ -165,8 +166,9 @@ void grayscale(dimage_ptr<float> out, dimage_ptr<const FROM,D> in)
 
 template void grayscale(dimage_ptr<float> out, dimage_ptr<const uchar3> in);
 template void grayscale(dimage_ptr<float> out, dimage_ptr<const float3> in);
+/*}}}*/
 
-// luminance ------------------------------------------------------------
+//{{{ luminance ------------------------------------------------------------
 
 template <class TO, class FROM> struct luminance_xform;
 
@@ -187,7 +189,9 @@ void luminance(dimage_ptr<float> out, dimage_ptr<const FROM,D> in)
 
 template void luminance(dimage_ptr<float> out, dimage_ptr<const float3> in);
 
-// convolution ------------------------------------------------------------
+/*}}}*/
+
+//{{{ convolution ------------------------------------------------------------
 
 __constant__ float c_conv_kernel[20]; // max kernel diameter == 20
 texture<float, 2, cudaReadModeElementType> t_in_convolution_float;
@@ -393,8 +397,9 @@ template void convolve(dimage_ptr<float3,1> out, dimage_ptr<const float3,1> in,
 template void convolve(dimage_ptr<float,3> out, dimage_ptr<const float,3> in, 
                        const array<float,8> &kernel, int);
 #endif
+/*}}}*/
 
-// I/O ------------------------------------------------------------
+//{{{ I/O ------------------------------------------------------------
 
 void load_image(const std::string &fname, std::vector<uchar4> *data,
                 int *width, int *height)
@@ -491,3 +496,4 @@ void save_image(const std::string &fname, const std::vector<uchar4> &data,
         throw std::runtime_error("Error saving output image");
 }
 
+/*}}}*/
