@@ -686,7 +686,7 @@ void print_help(const char *progname)
             "  - yaroslavsky_bilateral[rho,h]\n"
             "  - brightness_contrast[brightness,contrast]\n"
             "  - hue_saturation_lightness[hue,saturation,lightness]\n"
-            "  - unsharp mask[sigma,amount,threshold]\n"
+            "  - unsharp_mask[sigma,amount,threshold]\n"
             "\n"
             " pre_filter and post_filter are:\n"
             "  - bspline3\n"
