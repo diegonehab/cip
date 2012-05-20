@@ -76,6 +76,13 @@ void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<const float,C> in,
                    float sigma);
 
 template <int C>
+void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<float,C> in,
+                   float sigma)
+{
+    gaussian_blur(out, dimage_ptr<const float,C>(in), sigma);
+}
+
+template <int C>
 void gaussian_blur(dimage_ptr<float, C> out, float sigma)
 {
     gaussian_blur( out, dimage_ptr<const float,C>(out), sigma);
