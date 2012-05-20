@@ -3,8 +3,10 @@
 #include <FL/Fl_PNM_Image.H>
 #include <FL/filename.H>
 #include <cutil.h>
+#include <complex>
 #include "symbol.h"
 #include "math_util.h"
+#include "recfilter.h"
 #include "effects.h"
 #include "image_util.h"
 
@@ -495,5 +497,108 @@ void save_image(const std::string &fname, const std::vector<uchar4> &data,
     if(!cutSavePPM4ub(fname.c_str(), (unsigned char *)&data[0], width, height))
         throw std::runtime_error("Error saving output image");
 }
+
+/*}}}*/
+
+//{{{ gaussian blur ---------------------------------------------------------
+
+namespace
+{
+    typedef std::complex<double> dcomplex;
+    const dcomplex d1(1.41650, 1.00829);
+    const double d3(1.86543);
+
+    double qs(double s) {
+        return .00399341 + .4715161*s;
+    }
+
+    double ds(double d, double s) {
+        return pow(d, 1.0/qs(s));
+    }
+
+    dcomplex ds(dcomplex d, double s)
+    {
+        double q = qs(s);
+        return std::polar(pow(abs(d),1.0/q), arg(d)/q);
+    }
+
+    void gaussian_weights1(double s, Vector<float,2> &w)
+    {
+        double d = ds(d3, s);
+
+        int sign;
+        if(rec_op(1,1)==0)
+            sign = -1;
+        else
+            sign = 1;
+
+        w[0] = static_cast<float>(-(1.0-d)/d);
+        w[1] = sign*static_cast<float>(1.0/d);
+    }
+
+    void gaussian_weights2(double s, Vector<float,3> &w)
+    {
+        dcomplex d = ds(d1, s);
+        double n2 = abs(d);
+        n2 *= n2;
+        double re = real(d);
+
+        int sign;
+        if(rec_op(1,1)==0)
+            sign = -1;
+        else
+            sign = 1;
+
+        w[0] = static_cast<float>((1-2*re+n2)/n2);
+        w[1] = sign*static_cast<float>(2*re/n2);
+        w[2] = sign*static_cast<float>(-1/n2);
+    }
+
+}
+
+
+template <int C>
+void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<const float,C> in,
+                   float sigma)
+{
+    recfilter5_plan *plan = NULL;
+
+    try
+    {
+        Vector<float,1+1> weights1;
+        gaussian_weights1(sigma,weights1);
+
+        plan = recfilter5_create_plan<1>(in.width(), in.height(), 
+                                         in.rowstride(), weights1);
+
+        for(int i=0; i<C; ++i)
+            recfilter5(plan, out[i], in[i]);
+
+        free(plan);
+
+        Vector<float,1+2> weights2;
+        gaussian_weights2(sigma,weights2);
+        plan = recfilter5_create_plan<2>(in.width(), in.height(), 
+                                         in.rowstride(), weights2);
+
+        for(int i=0; i<C; ++i)
+            recfilter5(plan, out[i]);
+
+        free(plan);
+    }
+    catch(...)
+    {
+        free(plan);
+        throw;;
+    }
+}
+
+template
+void gaussian_blur(dimage_ptr<float> out, dimage_ptr<const float> in, 
+                   float sigma);
+
+template
+void gaussian_blur(dimage_ptr<float,3> out, dimage_ptr<const float,3> in, 
+                   float sigma);
 
 /*}}}*/

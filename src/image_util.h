@@ -69,6 +69,12 @@ void luminance(dimage_ptr<float> out, dimage_ptr<T,C> in)
     luminance(out, dimage_ptr<const T,C>(in));
 }
 
+// gaussian blue ------------------------------------------
+
+template <int C>
+void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<const float,C> in,
+                   float sigma);
+
 // I/O ----------------------------
 
 void load_image(const std::string &fname, std::vector<uchar4> *data,
