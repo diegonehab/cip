@@ -44,4 +44,9 @@ __device__ inline float1 lerp(float1 a, float1 b, float alpha)
     return make_float1(lerp(a.x, b.x, alpha));
 }
 
+__device__ inline float3 expf(float3 v)
+{
+    return make_float3(expf(v.x),expf(v.y),expf(v.z));
+}
+
 #endif
