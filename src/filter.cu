@@ -32,12 +32,26 @@ const int
 __constant__ float2 blue_noise[SAMPDIM];
 __constant__ float bspline3_data[SAMPDIM*KS*KS];
 
+texture<float, 2, cudaReadModeElementType> t_aux_float;
+
+struct texfetch_aux_float
+{
+    typedef float result_type;
+
+    __device__ float operator()(float x, float y)
+    {
+        return tex2D(t_aux_float, x, y);
+    }
+};
+
 __constant__ filter_operation filter_op;
 
 // do the actual value processing according to what's in 'filter_op'
 template <effect_type OP, class S>
 __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
+    bspline3_sampler<texfetch_aux_float> sampler_aux_float;
+
     switch(OP)
     {
     case EFFECT_POSTERIZE:
@@ -75,6 +89,9 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
     case EFFECT_HUE_SATURATION_LIGHTNESS:
         return hue_saturation_lightness(sampler(pos),filter_op.hue,
                                    filter_op.saturation,filter_op.lightness);
+    case EFFECT_UNSHARP_MASK:
+        return unsharp_mask(sampler(pos),sampler_aux_float(pos),
+                            filter_op.amount,filter_op.threshold);
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);
@@ -95,6 +112,7 @@ struct filter_plan
 {
     filter_plan() 
         : a_in(NULL)
+        , a_aux_float(NULL)
         , prefilter_recfilter_plan(NULL)
     {
     }
@@ -105,10 +123,15 @@ struct filter_plan
 
         if(a_in)
             cudaFreeArray(a_in);
+
+        if(a_aux_float)
+            cudaFreeArray(a_aux_float);
     }
 
     int flags;
-    cudaArray *a_in;
+    cudaArray *a_in, *a_aux_float;
+    dimage<float> img_aux_float_orig,
+                  img_aux_float;
 
     filter_operation op;
 
@@ -181,16 +204,17 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     cudaMallocArray(&plan->a_in, &ccd, img.width(),img.height());
 
+    dimage<float,C> preproc_img;
+
     if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
     {
+        preproc_img.resize(img.width(), img.height());
+
         recfilter5_plan *postfilter_plan = 
             recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
                                       weights, CLAMP_TO_EDGE, 1);
         try
         {
-
-            dimage<float,C> preproc_img(img.width(), img.height());
-
             if(flags & VERBOSE)
                 timer = &timers.gpu_add("Convolve with bspline3^-1",
                                         img.width()*img.height(), "P");
@@ -213,7 +237,10 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
         }
     }
     else
+    {
         copy_to_array(plan->a_in, img);
+        preproc_img = img;
+    }
 
     if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
     {
@@ -232,6 +259,26 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
     plan->temp_image.resize(img.width(), img.height());
 
     init_blue_noise();
+
+    switch(op.type)
+    {
+    case EFFECT_UNSHARP_MASK:
+        ccd = cudaCreateChannelDesc<float>();
+        cudaMallocArray(&plan->a_aux_float, &ccd, img.width(), img.height());
+        check_cuda_error("cudaMallocArray");
+
+        plan->img_aux_float_orig.resize(img.width(), img.height());
+        luminance(&plan->img_aux_float_orig, &preproc_img);
+
+        plan->img_aux_float.resize(img.width(), img.height());
+
+        t_aux_float.normalized = false;
+        t_aux_float.filterMode = cudaFilterModeLinear;
+
+        t_aux_float.addressMode[0] = t_aux_float.addressMode[1] = cudaAddressModeClamp;
+
+        break;
+    }
 
     return plan;
 }/*}}}*/
@@ -414,6 +461,18 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     CASE(EFFECT_YAROSLAVSKY_BILATERAL);
     CASE(EFFECT_BRIGHTNESS_CONTRAST);
     CASE(EFFECT_HUE_SATURATION_LIGHTNESS);
+    case EFFECT_UNSHARP_MASK:
+        assert(plan->a_aux_float != NULL);
+
+        gaussian_blur(&plan->img_aux_float, &plan->img_aux_float_orig, op.sigma);
+
+        copy_to_array(plan->a_aux_float, dimage_ptr<const float>(&plan->img_aux_float));
+        cudaBindTextureToArray(t_aux_float, plan->a_aux_float);
+
+        filter_kernel1<EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+
+        cudaUnbindTexture(t_aux_float);
+        break;
     default:
         assert(false);
     }

@@ -429,4 +429,27 @@ float hue_saturation_lightness(float v, float hue, float saturation,
     return grayscale(hue_saturation_lightness(make_float3(v,v,v),hue,saturation,lightness));
 }
 
+// unsharp mask -----------------------------------
+
+__device__ inline
+float3 unsharp_mask(float3 v, float blurred_vy, float amount, float threshold)
+{
+    float3 v_yiq = rgb2yiq(v);
+
+    float dy = v_yiq.x - blurred_vy;
+
+    v_yiq.x = v_yiq.x*amount*(dy < threshold ? dy*dy : dy);
+
+    return yiq2rgb(v_yiq);
+}
+
+__device__ inline
+float unsharp_mask(float v, float blurred_vy, float amount, float threshold)
+{
+    float dy = v - blurred_vy;
+
+    return v*amount*(dy < threshold ? dy*dy : dy);
+}
+
+
 #endif

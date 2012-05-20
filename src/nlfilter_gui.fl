@@ -3,8 +3,8 @@ version 1.0300
 header_name {.h} 
 code_name {.cxx}
 widget_class MainFrameUI {open
-  xywh {930 418 720 155} type Double
-  class Fl_Double_Window visible
+  xywh {930 418 720 155} type Double hide
+  class Fl_Double_Window
 } {
   Fl_Menu_Bar {} {open
     xywh {0 0 720 25}
@@ -49,7 +49,7 @@ widget_class MainFrameUI {open
     callback on_undo_effect
     xywh {85 119 55 25}
   }
-  Fl_Group m_param_group {open selected
+  Fl_Group m_param_group {open
     xywh {350 31 366 120} align 5
   } {}
   Fl_Value_Output m_status_fps {
@@ -205,5 +205,23 @@ widget_class ParamHueSaturationLightnessUI {open
   Fl_Value_Slider lightness {
     label {lightness:}
     xywh {85 68 265 25} type {Horz Knob} align 4 minimum -100 maximum 100
+  }
+} 
+
+widget_class ParamUnsharpMaskUI {open
+  xywh {736 789 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Value_Slider radius {
+    label {radius:}
+    xywh {80 4 270 25} type {Horz Knob} align 4 maximum 500 value 1
+  }
+  Fl_Value_Slider amount {
+    label {amount:}
+    xywh {80 37 270 25} type {Horz Knob} align 4 maximum 10
+  }
+  Fl_Value_Slider threshold {
+    label {threshold:} selected
+    xywh {80 72 270 25} type {Horz Knob} align 4 maximum 2
   }
 } 

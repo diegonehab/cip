@@ -26,7 +26,8 @@ enum effect_type
     EFFECT_LAPLACE_EDGE_ENHANCEMENT,
     EFFECT_YAROSLAVSKY_BILATERAL,
     EFFECT_BRIGHTNESS_CONTRAST,
-    EFFECT_HUE_SATURATION_LIGHTNESS
+    EFFECT_HUE_SATURATION_LIGHTNESS,
+    EFFECT_UNSHARP_MASK
 };
 
 enum filter_type
@@ -89,6 +90,13 @@ struct filter_operation
         struct
         {
             float hue, saturation, lightness;
+        };
+
+        // unsharp mask
+        struct
+        {
+            float dummy, // will use threshold above
+                  sigma, amount;
         };
     };
 };
