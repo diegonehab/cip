@@ -438,7 +438,7 @@ float3 unsharp_mask(float3 v, float blurred_vy, float amount, float threshold)
 
     float dy = v_yiq.x - blurred_vy;
 
-    v_yiq.x = v_yiq.x*amount*(dy < threshold ? dy*dy : dy);
+    v_yiq.x += v_yiq.x*amount*(dy < threshold ? dy*dy : dy);
 
     return yiq2rgb(v_yiq);
 }
@@ -448,7 +448,7 @@ float unsharp_mask(float v, float blurred_vy, float amount, float threshold)
 {
     float dy = v - blurred_vy;
 
-    return v*amount*(dy < threshold ? dy*dy : dy);
+    return v+ v*amount*(dy < threshold ? dy*dy : dy);
 }
 
 
