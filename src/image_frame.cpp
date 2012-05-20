@@ -198,7 +198,9 @@ void ImageFrame::set_input_image(dimage_ptr<float3> img)
 
     pimpl->img_input.resize(img.width(),img.height());
     convert(&pimpl->img_input, img);
-    grayscale(pimpl->img_input_grayscale, img);
+
+    pimpl->img_input_grayscale.resize(img.width(), img.height());
+    grayscale(&pimpl->img_input_grayscale, img);
 
     // to create textures and setup output buffers
     set_grayscale(pimpl->grayscale);

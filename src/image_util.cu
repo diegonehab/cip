@@ -14,13 +14,12 @@ const int BW = 32, // cuda block width
           BH = 16, // cuda block height
           NB = 3;
 
-template <class T, int C, class U, int D>/*{{{*/
+template <class XFORM, class TO, int C, class FROM, int D>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW*BH, NB)
 #endif
-void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
-    typename enable_if<pixel_traits<T>::is_integral == pixel_traits<U>::is_integral>::type*)
+void kernel(dimage_ptr<TO,C> out, dimage_ptr<const FROM,D> in)
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -33,56 +32,14 @@ void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
     in += idx;
     out += idx;
 
-    *out = *in;
-}/*}}}*/
+    XFORM xform;
 
-template <class T, int C, class U, int D>/*{{{*/
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
-    typename enable_if<pixel_traits<T>::is_integral && !pixel_traits<U>::is_integral>::type*)
-{
-    int tx = threadIdx.x, ty = threadIdx.y;
+    *out = xform(*in);
+}
 
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(!in.is_inside(x,y))
-        return;
-
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
-
-    *out = pixel_traits<T,C>::make_pixel(saturate(*in)*255.0f);
-}/*}}}*/
-
-template <class T, int C, class U, int D>/*{{{*/
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void convert_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,
-    typename enable_if<!pixel_traits<T>::is_integral && pixel_traits<U>::is_integral>::type*)
-{
-    int tx = threadIdx.x, ty = threadIdx.y;
-
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(!in.is_inside(x,y))
-        return;
-
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
-
-    *out = pixel_traits<T,C>::make_pixel(*in)/255.0;
-}/*}}}*/
-
-
-template <class T, int C, class U, int D>
-void convert(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
+template <template<class,class> class XFORM, 
+          class TO, int C, class FROM, int D>
+void call_kernel(dimage_ptr<TO,C> out, dimage_ptr<const FROM,D> in)
 {
     if(out.width() != in.width() || out.height() != in.height())
         throw std::runtime_error("Image dimensions don't match");
@@ -90,7 +47,52 @@ void convert(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
     dim3 bdim(BW,BH),
          gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
 
-    convert_kernel<<<gdim, bdim>>>(out, in, (void *)NULL);
+    typedef XFORM<typename pixel_traits<TO,C>::pixel_type,
+                  typename pixel_traits<FROM,D>::pixel_type> xform;
+
+    kernel<xform><<<gdim, bdim>>>(out, in);
+}
+
+//{{{ conversion between pixel types --------------------------------------
+
+template <class TO, class FROM, class EN=void>
+struct convert_xform
+{
+    __device__ TO operator()(const FROM &p) const
+    {
+        return pixel_traits<TO>::make_pixel(p);
+    }
+};
+
+template <class TO, class FROM>
+struct convert_xform<TO,FROM,
+    typename enable_if<pixel_traits<FROM>::is_integral && 
+                      !pixel_traits<TO>::is_integral>::type>
+{
+    __device__ TO operator()(const FROM &p) const
+    {
+        return pixel_traits<TO>::make_pixel(p)/255.0f;
+    }
+};
+
+template <class TO, class FROM>
+struct convert_xform<TO,FROM,
+    typename enable_if<!pixel_traits<FROM>::is_integral && 
+                       pixel_traits<TO>::is_integral>::type>
+{
+    __device__ TO operator()(const FROM &p) const
+    {
+        return pixel_traits<TO>::make_pixel(saturate(p/255.0f));
+    }
+};
+
+template <class TO, class FROM>
+struct convert_xform2 : convert_xform<TO,FROM> {};
+
+template <class TO, int C, class FROM, int D>
+void convert(dimage_ptr<TO,C> out, dimage_ptr<const FROM,D> in)
+{
+    call_kernel<convert_xform2>(out, in);
 }
 
 template void convert(dimage_ptr<float3> out, dimage_ptr<const float,3> in);
@@ -104,42 +106,23 @@ template void convert(dimage_ptr<float,3> out, dimage_ptr<const uchar3> in);
 template void convert(dimage_ptr<float3> out, dimage_ptr<const float> in);
 template void convert(dimage_ptr<float,3> out, dimage_ptr<const float> in);
 template void convert(dimage_ptr<uchar3> out, dimage_ptr<const float> in);
+/*}}}*/
 
 // lrgb2srgb ------------------------------------------------------------
 
-
-template <class T, int C, class U, int D>
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void lrgb2srgb_kernel(dimage_ptr<T,C> out, dimage_ptr<const U,D> in,/*{{{*/
-    typename enable_if<pixel_traits<T>::is_integral == pixel_traits<U>::is_integral>::type*)
+template <class TO, class FROM>
+struct lrgb2srgb_xform
 {
-    int tx = threadIdx.x, ty = threadIdx.y;
+    __device__ TO operator()(const FROM &p) const
+    {
+        return lrgb2srgb(p);
+    }
+};
 
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(!in.is_inside(x,y))
-        return;
-
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
-
-    *out = lrgb2srgb(*in);
-}/*}}}*/
-
-template <class T, int C, class U, int D>
-void lrgb2srgb(dimage_ptr<T,C> out, dimage_ptr<const U,D> in)
+template <class TO, int C, class FROM, int D>
+void lrgb2srgb(dimage_ptr<TO,C> out, dimage_ptr<const FROM,D> in)
 {
-    if(out.width() != in.width() || out.height() != in.height())
-        throw std::runtime_error("Image dimensions don't match");
-
-    dim3 bdim(BW,BH),
-         gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
-
-    lrgb2srgb_kernel<<<gdim, bdim>>>(out, in, (void *)NULL);
+    call_kernel<lrgb2srgb_xform>(out, in);
 }
 
 template void lrgb2srgb(dimage_ptr<float3> out, dimage_ptr<const float3> in);
@@ -149,68 +132,39 @@ template void lrgb2srgb(dimage_ptr<float> out, dimage_ptr<const float> in);
 
 // grayscale ------------------------------------------------------------
 
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void grayscale(dimage_ptr<float,1> out, dimage_ptr<const uchar3,1> in)
+template <class FROM, class EN=void>
+struct grayscale_xform_base
 {
-    int tx = threadIdx.x, ty = threadIdx.y;
+    __device__ float operator()(const FROM &p) const
+    {
+        return grayscale(p);
+    }
+};
 
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
+template <class FROM>
+struct grayscale_xform_base<FROM,
+    typename enable_if<pixel_traits<FROM>::is_integral>::type>
+{
+    __device__ float operator()(const FROM &p) const
+    {
+        return grayscale(make_float3(p)/255.0f);
+    }
+};
 
-    if(!in.is_inside(x,y))
-        return;
+template <class TO, class FROM>
+struct grayscale_xform;
 
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
+template <class FROM>
+struct grayscale_xform<float,FROM> : grayscale_xform_base<FROM> {};
 
-    uchar3 p = *in;
-    *out = grayscale(make_float3(p.x/255.0f, p.y/255.0f, p.z/255.0f));
+template <class FROM, int D>
+void grayscale(dimage_ptr<float> out, dimage_ptr<const FROM,D> in)
+{
+    call_kernel<grayscale_xform>(out, in);
 }
 
-__global__
-#if USE_LAUNCH_BOUNDS
-__launch_bounds__(BW*BH, NB)
-#endif
-void grayscale(dimage_ptr<float,1> out, dimage_ptr<const float3,1> in)
-{
-    int tx = threadIdx.x, ty = threadIdx.y;
-
-    int x = blockIdx.x*BW+tx, y = blockIdx.y*BH+ty;
-
-    if(!in.is_inside(x,y))
-        return;
-
-    int idx = in.offset_at(x,y);
-    in += idx;
-    out += idx;
-
-    *out = grayscale(*in);
-}
-
-template <class T>
-void call_grayscale(dimage<float,1> &out, dimage_ptr<const T,1> in)
-{
-    out.resize(in.width(), in.height(), in.rowstride());
-
-    dim3 bdim(BW,BH),
-         gdim((in.width()+bdim.x-1)/bdim.x, (in.height()+bdim.y-1)/bdim.y);
-
-    grayscale<<<gdim, bdim>>>(&out, in);
-}
-
-
-void grayscale(dimage<float,1> &out, dimage_ptr<const float3,1> in)
-{
-    call_grayscale(out, in);
-}
-
-void grayscale(dimage<float,1> &out, dimage_ptr<const uchar3,1> in)
-{
-    call_grayscale(out, in);
-}
+template void grayscale(dimage_ptr<float> out, dimage_ptr<const uchar3> in);
+template void grayscale(dimage_ptr<float> out, dimage_ptr<const float3> in);
 
 // convolution ------------------------------------------------------------
 

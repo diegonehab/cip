@@ -748,7 +748,7 @@ int main(int argc, char *argv[])
             {
                 dimage<float,1> d_gray;
                 d_gray.resize(d_img.width(), d_img.height());
-                grayscale(d_gray, &d_img);
+                grayscale(&d_gray, &d_img);
 
                 timerzao->start();
 
