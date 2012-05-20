@@ -3,6 +3,24 @@
 
 #include "math_util.h"
 
+// maps to/from yiq space from/to rgb space ------------------------------
+
+__device__ inline
+float3 rgb2yiq(float3 rgb)
+{
+    return make_float3(0.299f*rgb.x + 0.587f*rgb.y + 0.114f*rgb.z,
+                       0.595f*rgb.x - 0.274453f*rgb.y - 0.321263f*rgb.z,
+                       0.211456f*rgb.x - 0.522591f*rgb.y + 0.311135f*rgb.z);
+}
+
+__device__ inline
+float3 yiq2rgb(float3 yiq)
+{
+    return make_float3(yiq.x + 0.9563f*yiq.y + 0.6210f*yiq.z,
+                       yiq.x + 0.2721f*yiq.y - 0.6474f*yiq.z,
+                       yiq.x - 1.1070f*yiq.y + 1.7046f*yiq.z);
+}
+
 // maps to/from gamma space from/to linear space ------------------------------
 
 // apply sRGB non-linearity to value
