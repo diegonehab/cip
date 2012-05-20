@@ -30,7 +30,7 @@ __device__ inline
 float3 yiq2rgb(float3 yiq)
 {
     return make_float3(yiq.x + 0.9563f*yiq.y + 0.6210f*yiq.z,
-                       yiq.x + 0.2721f*yiq.y - 0.6474f*yiq.z,
+                       yiq.x - 0.2721f*yiq.y - 0.6474f*yiq.z,
                        yiq.x - 1.1070f*yiq.y + 1.7046f*yiq.z);
 }
 
