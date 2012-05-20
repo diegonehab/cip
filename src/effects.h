@@ -78,6 +78,20 @@ float grayscale(float3 in)
     return 0.2126f * in.x + 0.7152f*in.y + 0.0722f*in.z;
 }
 
+// luminance --------------------------------------------------
+//
+__device__ inline 
+float luminance(float in)
+{
+    return in;
+}
+
+__device__ inline 
+float luminance(float3 in)
+{
+    return  .299f * in.x + .587f * in.y + .114f * in.z;
+}
+
 // scale -------------------------------------------------------------
 
 template <class T>

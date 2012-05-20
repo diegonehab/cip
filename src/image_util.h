@@ -58,6 +58,16 @@ void lrgb2srgb(dimage_ptr<T,C> out, dimage_ptr<U,D> in)
     lrgb2srgb(out, dimage_ptr<const U,D>(in));
 }
 
+// luminance -----------------------------
+//
+template <class T, int C>
+void luminance(dimage_ptr<float> out, dimage_ptr<const T,C> in);
+
+template <class T, int C>
+void luminance(dimage_ptr<float> out, dimage_ptr<T,C> in)
+{
+    luminance(out, dimage_ptr<const T,C>(in));
+}
 
 // I/O ----------------------------
 

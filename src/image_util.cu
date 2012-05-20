@@ -166,6 +166,27 @@ void grayscale(dimage_ptr<float> out, dimage_ptr<const FROM,D> in)
 template void grayscale(dimage_ptr<float> out, dimage_ptr<const uchar3> in);
 template void grayscale(dimage_ptr<float> out, dimage_ptr<const float3> in);
 
+// luminance ------------------------------------------------------------
+
+template <class TO, class FROM> struct luminance_xform;
+
+template <class FROM>
+struct luminance_xform<float,FROM>
+{
+    __device__ float operator()(const FROM &p) const
+    {
+        return luminance(p);
+    }
+};
+
+template <class FROM, int D>
+void luminance(dimage_ptr<float> out, dimage_ptr<const FROM,D> in)
+{
+    call_kernel<luminance_xform>(out, in);
+}
+
+template void luminance(dimage_ptr<float> out, dimage_ptr<const float3> in);
+
 // convolution ------------------------------------------------------------
 
 __constant__ float c_conv_kernel[20]; // max kernel diameter == 20
