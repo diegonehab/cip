@@ -5,6 +5,19 @@
 
 // maps to/from yiq space from/to rgb space ------------------------------
 
+
+__device__ inline
+float rgb2yiq(float gray)
+{
+    return gray;
+}
+
+__device__ inline
+float yiq2rgb(float y)
+{
+    return y;
+}
+
 __device__ inline
 float3 rgb2yiq(float3 rgb)
 {
