@@ -331,7 +331,6 @@ void collect_carries(Matrix<float,ORDER,WS> *g_pybar,
     if(ty == 0)
 #endif
     {
-
         Matrix<float,ORDER,WS> 
             &pybar = (Matrix<float,ORDER,WS>&)g_pybar[n*c_m_size+m][0][tx],
             &ezhat = (Matrix<float,ORDER,WS>&)g_ezhat[n*c_m_size+m][0][tx],
@@ -370,6 +369,7 @@ void collect_carries(Matrix<float,ORDER,WS> *g_pybar,
 
                 e[0] = *bdata--;
 
+#pragma unroll
                 for(int j=WS-2; j>=0; --j, --bdata)
                 {
 #if CUDA_SM >= 20 || ORDER>1
