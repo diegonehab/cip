@@ -7,6 +7,12 @@
 #include "blue_noise.h"
 #include "bspline3_sampler.h"
 #include "recfilter.h"
+#if CUDA_SM < 20
+#   include "cuPrintf.cu"
+#   if __CUDA_ARCH__
+#       define printf cuPrintf
+#   endif
+#endif
 
 #define USE_LAUNCH_BOUNDS 1
 const int BW_F1 = 32, // cuda block width

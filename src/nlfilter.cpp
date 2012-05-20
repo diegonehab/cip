@@ -11,6 +11,9 @@
 #include "nlfilter_gui.h"
 #include "image_frame.h"
 #include "threads.h"
+#if CUDA_SM < 20
+#   include "cuPrintf.cuh"
+#endif
 
 class MainFrame : public MainFrameUI
 {
@@ -757,6 +760,11 @@ int main(int argc, char *argv[])
             if(infile.empty())
                 throw std::runtime_error("Must specify an input image");
 
+#if CUDA_SM < 20
+            cudaPrintfInit();
+#endif
+
+
             filter_operation op = parse_filter_operation(effect);
 
             op.pre_filter = prefilter;
@@ -827,6 +835,11 @@ int main(int argc, char *argv[])
 
             timers.flush();
 
+#if CUDA_SM < 20
+            cudaPrintfDisplay(stdout, true);
+            cudaPrintfEnd();
+#endif
+
             return 0;
         }
         else
@@ -842,6 +855,10 @@ int main(int argc, char *argv[])
             // must open an image immediately?
             if(!infile.empty())
                 frame.open(infile); // do it
+
+#if CUDA_SM < 20
+            cudaPrintfInit();
+#endif
 
             // run main loop
             return Fl::run();
