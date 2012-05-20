@@ -190,6 +190,11 @@ void luminance(dimage_ptr<float> out, dimage_ptr<const FROM,D> in)
 }
 
 template void luminance(dimage_ptr<float> out, dimage_ptr<const float3> in);
+template void luminance(dimage_ptr<float> out, dimage_ptr<const float,3> in);
+template<> void luminance(dimage_ptr<float> out, dimage_ptr<const float> in)
+{
+    out = in;
+}
 
 /*}}}*/
 
