@@ -322,7 +322,7 @@ public:
         for(int i=0; i<C; ++i)
         {
             cudaMemcpy2D(out+width()*height()*i, width()*sizeof(texel_type), 
-                         &m_data+i*channelstride(), 
+                         m_data+i*channelstride(), 
                          rowstride()*sizeof(texel_type), 
                          width()*sizeof(texel_type), height(), 
                          cudaMemcpyDeviceToHost);
@@ -344,7 +344,7 @@ public:
 
         for(int i=0; i<C; ++i)
         {
-            cudaMemcpy2D(&m_data+i*channelstride(), rowstride()*sizeof(texel_type), 
+            cudaMemcpy2D(m_data+i*channelstride(), rowstride()*sizeof(texel_type), 
                          in+i*width()*height(), width()*sizeof(texel_type), 
                          width()*sizeof(texel_type), height(), cudaMemcpyHostToDevice);
         }
