@@ -252,7 +252,7 @@ typedef float pixel_type;
 template <int R>
 recfilter5_plan *recfilter5_create_plan(int width, int height, int rowstride,
                                         const Vector<float, R+1> &w,
-                                        BorderType border_type=CLAMP_TO_ZERO, 
+                                        BorderType border_type=REFLECT, 
                                         int border=1);
 void free(recfilter5_plan *plan);
 

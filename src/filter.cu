@@ -212,7 +212,7 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
         recfilter5_plan *postfilter_plan = 
             recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
-                                      weights, CLAMP_TO_EDGE, 1);
+                                      weights);
         try
         {
             if(flags & VERBOSE)
@@ -246,7 +246,7 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
     {
         plan->prefilter_recfilter_plan = 
             recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
-                                      weights, CLAMP_TO_EDGE, 1);
+                                      weights);
     }
 
     cfg::tex().normalized = false;
