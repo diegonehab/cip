@@ -503,6 +503,16 @@ void save_image(const std::string &fname, const std::vector<uchar4> &data,
         throw std::runtime_error("Error saving output image");
 }
 
+void save_image(const std::string &fname, const std::vector<unsigned char> &data,
+                 int width, int height)
+{
+    if(fl_filename_match(strupr(fname).c_str(),"*.PPM"))
+        throw std::runtime_error("We only support PPM output image format");
+
+    if(!cutSavePPMub(fname.c_str(), (unsigned char *)&data[0], width, height))
+        throw std::runtime_error("Error saving output image");
+}
+
 void save_image(const std::string &fname, dimage_ptr<const uchar3> img)
 {
     std::vector<uchar4> data;
@@ -515,6 +525,14 @@ void save_image(const std::string &fname, dimage_ptr<const unsigned char,3> img)
     dimage<uchar3> aux;
     convert(&aux, img);
     save_image(fname, &aux);
+}
+
+void save_image(const std::string &fname, dimage_ptr<const unsigned char> img)
+{
+    std::vector<unsigned char> data;
+    img.copy_to_host(data);
+
+    save_image(fname, data, img.width(), img.height());
 }
 
 /*}}}*/

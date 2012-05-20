@@ -96,7 +96,11 @@ void load_image(const std::string &fname, std::vector<uchar4> *data,
 void save_image(const std::string &fname, const std::vector<uchar4> &data,
                 int width, int height);
 
+void save_image(const std::string &fname, const std::vector<unsigned char> &data,
+                 int width, int height);
+
 void save_image(const std::string &fname, dimage_ptr<const uchar3> img);
 void save_image(const std::string &fname, dimage_ptr<const unsigned char,3> img);
+void save_image(const std::string &fname, dimage_ptr<const unsigned char> img);
 
 #endif
