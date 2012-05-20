@@ -69,11 +69,17 @@ void luminance(dimage_ptr<float> out, dimage_ptr<T,C> in)
     luminance(out, dimage_ptr<const T,C>(in));
 }
 
-// gaussian blue ------------------------------------------
+// gaussian blur ------------------------------------------
 
 template <int C>
 void gaussian_blur(dimage_ptr<float, C> out, dimage_ptr<const float,C> in,
                    float sigma);
+
+template <int C>
+void gaussian_blur(dimage_ptr<float, C> out, float sigma)
+{
+    gaussian_blur( out, dimage_ptr<const float,C>(out), sigma);
+}
 
 // I/O ----------------------------
 
