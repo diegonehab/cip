@@ -84,7 +84,7 @@ struct convert_xform<TO,FROM,
 {
     __device__ TO operator()(const FROM &p) const
     {
-        return pixel_traits<TO>::make_pixel(saturate(p/255.0f));
+        return pixel_traits<TO>::make_pixel(saturate(p)*255.0f);
     }
 };
 
