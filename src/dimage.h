@@ -14,6 +14,7 @@ class dimage
 {
 public:
     typedef typename pixel_traits<T,1>::texel_type texel_type;
+    typedef typename remove_const<texel_type>::type mutable_texel_type;
 
     dimage(texel_type *data, int width, int height, int rowstride)
         : m_data(data, rowstride*height)
@@ -60,7 +61,7 @@ public:
         reset(NULL,0,0,0);
     }
 
-    void copy_to_host(texel_type *out) const
+    void copy_to_host(mutable_texel_type *out) const
     {
         for(int i=0; i<C; ++i)
         {
@@ -74,7 +75,7 @@ public:
         check_cuda_error("Error during memcpy from device to host");
     }
 
-    void copy_to_host(std::vector<texel_type> &out) const
+    void copy_to_host(std::vector<mutable_texel_type> &out) const
     {
         out.resize(width()*height());
         copy_to_host(&out[0]);
@@ -93,7 +94,7 @@ public:
 
         check_cuda_error("Error during memcpy from host to device");
     }
-    void copy_from_host(const std::vector<texel_type> &in, 
+    void copy_from_host(const std::vector<mutable_texel_type> &in, 
                         int width, int height, int rowstride=0)
     {
         assert(in.size() == width*height);
@@ -176,6 +177,7 @@ class dimage_ptr
 {
 public:
     typedef typename copy_const<T,typename pixel_traits<T,1>::texel_type>::type texel_type;
+    typedef typename remove_const<texel_type>::type mutable_texel_type;
 private:
 
     template <int D, class EN = void>
@@ -315,7 +317,7 @@ public:
     bool is_inside(int x, int y) const
         { return x < width() && y < height(); }
 
-    void copy_to_host(texel_type *out) const
+    void copy_to_host(mutable_texel_type *out) const
     {
         for(int i=0; i<C; ++i)
         {
@@ -329,7 +331,7 @@ public:
         check_cuda_error("Error during memcpy from device to host");
     }
 
-    void copy_to_host(std::vector<texel_type> &out) const
+    void copy_to_host(std::vector<mutable_texel_type> &out) const
     {
         out.resize(width()*height());
         copy_to_host(&out[0]);
@@ -349,7 +351,7 @@ public:
 
         check_cuda_error("Error during memcpy from host to device");
     }
-    void copy_from_host(const std::vector<texel_type> &in, 
+    void copy_from_host(const std::vector<mutable_texel_type> &in, 
                         int width, int height, int rowstride=0)
     {
         assert(in.size() == width*height);
