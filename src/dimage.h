@@ -315,6 +315,47 @@ public:
     bool is_inside(int x, int y) const
         { return x < width() && y < height(); }
 
+    void copy_to_host(texel_type *out) const
+    {
+        for(int i=0; i<C; ++i)
+        {
+            cudaMemcpy2D(out+width()*height()*i, width()*sizeof(texel_type), 
+                         &m_data+i*channelstride(), 
+                         rowstride()*sizeof(texel_type), 
+                         width()*sizeof(texel_type), height(), 
+                         cudaMemcpyDeviceToHost);
+        }
+
+        check_cuda_error("Error during memcpy from device to host");
+    }
+
+    void copy_to_host(std::vector<texel_type> &out) const
+    {
+        out.resize(width()*height());
+        copy_to_host(&out[0]);
+    }
+
+    void copy_from_host(const texel_type *in, int w, int h, int rs=0)
+    {
+        if(w != width() || h!=height())
+           throw std::runtime_error("Image dimensions mismatch");
+
+        for(int i=0; i<C; ++i)
+        {
+            cudaMemcpy2D(&m_data+i*channelstride(), rowstride()*sizeof(texel_type), 
+                         in+i*width()*height(), width()*sizeof(texel_type), 
+                         width()*sizeof(texel_type), height(), cudaMemcpyHostToDevice);
+        }
+
+        check_cuda_error("Error during memcpy from host to device");
+    }
+    void copy_from_host(const std::vector<texel_type> &in, 
+                        int width, int height, int rowstride=0)
+    {
+        assert(in.size() == width*height);
+        copy_from_host(&in[0], width, height, rowstride);
+    }
+
     dimage_ptr &operator=(dimage_ptr<const T,C> img)
     {
         if(width() != img.width() || height() != img.height())
