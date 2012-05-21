@@ -131,6 +131,7 @@ MainFrame::MainFrame()
     m_post_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
     m_post_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
     m_post_filter->add("Michell-Netravali",0,NULL,(void*)FILTER_MITCHELL_NETRAVALI);
+    m_post_filter->add("Box",0,NULL,(void*)FILTER_BOX);
     m_post_filter->value(1);
     m_post_filter->callback((Fl_Callback *)&MainFrame::on_filter_changed, this);
 }

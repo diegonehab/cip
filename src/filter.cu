@@ -6,6 +6,7 @@
 #include "image_util.h"
 #include "blue_noise.h"
 #include "cubic_sampler.h"
+#include "box_sampler.h"
 #include "bspline3.h"
 #include "mitchell_netravali.h"
 #include "recfilter.h"
@@ -662,6 +663,9 @@ void filter(filter_plan *plan, dimage_ptr<float,C> out, const filter_operation &
         break;
     case FILTER_MITCHELL_NETRAVALI:
         filter<cubic_sampler<mitchell_netravali_weights,texfetch>, C>(plan, out, op);
+        break;
+    case FILTER_BOX:
+        filter<box_sampler<texfetch>, C>(plan, out, op);
         break;
     default:
         assert(false);
