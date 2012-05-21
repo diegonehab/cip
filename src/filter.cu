@@ -5,7 +5,8 @@
 #include "symbol.h"
 #include "image_util.h"
 #include "blue_noise.h"
-#include "bspline3_sampler.h"
+#include "sampler.h"
+#include "bspline3.h"
 #include "recfilter.h"
 #if CUDA_SM < 20
 #   include "cuPrintf.cu"
@@ -57,7 +58,7 @@ __constant__ filter_operation filter_op;
 template <effect_type OP, class S>
 __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
-    bspline3_sampler<texfetch_aux_float> sampler_aux_float;
+    typename S::template rebind_sampler<texfetch_aux_float>::type sampler_aux_float;
     
     typedef typename S::result_type result_type;
 
@@ -343,7 +344,7 @@ void free(filter_plan *plan)/*{{{*/
     delete plan;
 }/*}}}*/
 
-template <effect_type OP,int C>
+template <class S, effect_type OP,int C>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
@@ -391,7 +392,7 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
 
     float *bspline3 = bspline3_data;
 
-    bspline3_sampler<typename cfg::texfetch_type> sampler;
+    S sampler;
 
     for(int s=0; s<SAMPDIM; ++s)
     {
@@ -470,7 +471,7 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
     *out = filter_traits<C>::normalize_sum(sum);
 }/*}}}*/
 
-template <int C>
+template <class POST_FILTER, int C>
 void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
 {
     filter_plan_C<C> *plan = dynamic_cast<filter_plan_C<C> *>(_plan);
@@ -490,13 +491,15 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     dim3 bdim(BW_F1,BH_F1),
          gdim((out.width()+bdim.x-1)/bdim.x, (out.height()+bdim.y-1)/bdim.y);
 
+    typedef filtered_sampler<POST_FILTER, typename cfg::texfetch_type> sampler;
+
     base_timer *timer = NULL;
 
 #define CASE(EFFECT) \
     case EFFECT:\
         if(plan->flags & VERBOSE)\
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");\
-        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+        filter_kernel1<sampler,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
         if(timer)\
             timer->stop();\
         break
@@ -540,7 +543,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
 
-        filter_kernel1<EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+        filter_kernel1<sampler,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
 
         if(timer)
             timer->stop();
@@ -582,6 +585,20 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     // maps back to gamma space
     lrgb2srgb(out, out);
 }/*}}}*/
+
+template <int C>
+void filter(filter_plan *plan, dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
+{
+    switch(op.post_filter)
+    {
+    case FILTER_BSPLINE3:
+    case FILTER_CARDINAL_BSPLINE3:
+        filter<bspline3_weights, C>(plan, out, op);
+        break;
+    default:
+        assert(false);
+    }
+}
 
 // Grayscale filtering ===================================================/*{{{*/
 

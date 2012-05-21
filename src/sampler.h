@@ -1,60 +1,22 @@
-#ifndef NLFILTER_BSPLINE3_SAMPLER_H
-#define NLFILTER_BSPLINE3_SAMPLER_H
+#ifndef NLFILTER_SAMPLER_H
+#define NLFILTER_SAMPLER_H
 
 #include "math_util.h"
 
 #define USE_FAST_CUBIC_INTERPOLATION 1
 
-template <class T>
-__device__ void bspline3_weights(T alpha, T &w0, T &w1, T &w2, T &w3,
-                                 int k=0)
-{
-    T one_alpha = 1.0f - alpha,
-      alpha2 = alpha * alpha,
-      one_alpha2 = one_alpha*one_alpha;
-
-    switch(k)
-    {
-    case 0:
-        w0 = (1/6.f) * one_alpha2*one_alpha,
-        w1 = (2/3.f) - 0.5f*alpha2*(2.0f-alpha),
-        w2 = (2/3.f) - 0.5f*one_alpha2*(2.0f-one_alpha),
-        w3 = (1/6.f) * alpha*alpha2;
-        break;
-    case 1:
-        w0 = -0.5f*alpha2 + alpha - 0.5f;
-        w1 = 1.5f*alpha2 - 2.0f*alpha;
-        w2 = -1.5f*alpha2 + alpha+0.5f;
-        w3 = 0.5f*alpha2;
-        break;
-    case 2:
-        w0 = 1.0f - alpha;
-        w1 = 3.0f*alpha - 2.0f;
-        w2 = -3.0f*alpha+1.0f;
-        w3 = alpha;
-        break;
-    }
-}
-
-inline float bspline3(float r)
-{
-    r = std::abs(r);
-
-    if (r < 1.f) 
-        return (4.f + r*r*(-6.f + 3.f*r))/6.f;
-    else if (r < 2.f) 
-        return  (8.f + r*(-12.f + (6.f - r)*r))/6.f;
-    else 
-        return 0.f;
-}
-
-
-template <class S>
-class bspline3_sampler
+template <class F, class S>
+class filtered_sampler
 {
 public:
     typedef S sampler_type;
     typedef typename S::result_type result_type;
+
+    template <class S2>
+    struct rebind_sampler
+    {
+        typedef filtered_sampler<F,S2> type;
+    };
 
     __device__ inline 
     result_type operator()(float2 pos, int kx=0, int ky=0) const
@@ -62,6 +24,8 @@ public:
         S sampler;
 
         pos -= 0.5f;
+
+        F filter;
 
 #if USE_FAST_CUBIC_INTERPOLATION
         if(kx < 2 && ky < 2)
@@ -71,8 +35,8 @@ public:
 
             float2 w[4];
 
-            bspline3_weights(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
-            bspline3_weights(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
+            filter(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
+            filter(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
 
 
             float2 g0 = w[0] + w[1],
@@ -111,7 +75,7 @@ public:
 
             float w0, w1, w2, w3;
 
-            bspline3_weights(alpha, w0, w1, w2, w3, ky);
+            filter(alpha, w0, w1, w2, w3, ky);
 
             float g0 = w0 + w1,
                   g1 = w2 + w3,
@@ -153,7 +117,7 @@ public:
 
             float w0, w1, w2, w3;
 
-            bspline3_weights(alpha, w0, w1, w2, w3, kx);
+            filter(alpha, w0, w1, w2, w3, kx);
 
             float g0 = w0 + w1,
                   g1 = w2 + w3,
@@ -208,8 +172,8 @@ public:
 
         float2 w[4];
 
-        bspline3_weights(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
-        bspline3_weights(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
+        filter(alpha.x, w[0].x, w[1].x, w[2].x, w[3].x, kx);
+        filter(alpha.y, w[0].y, w[1].y, w[2].y, w[3].y, ky);
 
         result_type value =  cuda_traits<result_type>::make(0);
 
