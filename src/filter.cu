@@ -18,11 +18,7 @@
 
 #define USE_LAUNCH_BOUNDS 1
 const int BW_F1 = 32, // cuda block width
-#if SAMPDIM == 8
           BH_F1 = 8; 
-#else
-          BH_F1 = 16;
-#endif
 
 const int BW_F2 = 32,
           BH_F2 = 8; 
