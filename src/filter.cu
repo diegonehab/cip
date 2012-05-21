@@ -603,7 +603,7 @@ void filter_kernel_box(dimage_ptr<float,C> out)/*{{{*/
 
     S sampler;
 
-    *out = do_filter<OP>(sampler, p);
+    *out = srgb2lrgb(do_filter<OP>(sampler, p));
 }/*}}}*/
 
 template <int C>
