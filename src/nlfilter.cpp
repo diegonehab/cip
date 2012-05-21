@@ -33,7 +33,7 @@ public:
     void on_undo_effect();
     void on_change_grayscale(bool gs);
 
-    static void on_postfilter_changed(Fl_Widget *,MainFrame *frame);
+    static void on_filter_changed(Fl_Widget *,MainFrame *frame);
 
     static void on_param_changed(Fl_Widget *,MainFrame *frame)
     {
@@ -122,14 +122,15 @@ MainFrame::MainFrame()
 
     m_pre_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
     m_pre_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
+    m_pre_filter->add("Michell-Netravali",0,NULL,(void*)FILTER_MITCHELL_NETRAVALI);
     m_pre_filter->value(1);
-    m_pre_filter->callback((Fl_Callback *)&MainFrame::on_param_changed, this);
+    m_pre_filter->callback((Fl_Callback *)&MainFrame::on_filter_changed, this);
 
     m_post_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
     m_post_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
+    m_post_filter->add("Michell-Netravali",0,NULL,(void*)FILTER_MITCHELL_NETRAVALI);
     m_post_filter->value(1);
-    m_post_filter->callback((Fl_Callback *)&MainFrame::on_postfilter_changed, 
-                             this);
+    m_post_filter->callback((Fl_Callback *)&MainFrame::on_filter_changed, this);
 }
 
 MainFrame::~MainFrame()
@@ -348,9 +349,9 @@ void MainFrame::on_change_grayscale(bool gs)
     update_image();
 }
 
-void MainFrame::on_postfilter_changed(Fl_Widget *,MainFrame *frame)
+void MainFrame::on_filter_changed(Fl_Widget *,MainFrame *frame)
 {
-    // must reprocess input image with new postfilter
+    // must reprocess input image with new pre- and post-filter
     frame->restart_render_thread();
     frame->update_image();
 }
@@ -691,6 +692,8 @@ filter_type parse_filter_type(const std::string &name)
         return FILTER_BSPLINE3;
     else if(name == "card-bspline3")
         return FILTER_CARDINAL_BSPLINE3;
+    else if(name == "mitchell-netravali")
+        return FILTER_MITCHELL_NETRAVALI;
     else
         throw std::runtime_error("Bad filter type");
 }
@@ -719,6 +722,7 @@ void print_help(const char *progname)
             " pre_filter and post_filter are:\n"
             "  - bspline3\n"
             "  - card-bspline3\n"
+            "  - mitchell-netravali\n"
             "\n"
             "without -o, shows a GUI\n";
 }

@@ -7,6 +7,7 @@
 #include "blue_noise.h"
 #include "sampler.h"
 #include "bspline3.h"
+#include "mitchell_netravali.h"
 #include "recfilter.h"
 #if CUDA_SM < 20
 #   include "cuPrintf.cu"
@@ -38,7 +39,7 @@ const int
 
 __constant__ float2 blue_noise[SAMPDIM];
 
-__constant__ float bspline3_data[SAMPDIM*KS*KS];
+__constant__ float prefilter_data[SAMPDIM*KS*KS];
 
 texture<float, 2, cudaReadModeElementType> t_aux_float;
 
@@ -198,6 +199,31 @@ struct filter_plan_C : filter_plan
 template<int C>
 void copy_to_array(cudaArray *out, dimage_ptr<const float,C> in);
 
+void init_pre_filter(float (*prefilter)(float))
+{
+    std::vector<float2> blue_noise;
+    std::vector<float> prefilter_data;
+    blue_noise.reserve(SAMPDIM);
+    prefilter_data.reserve(SAMPDIM*KS*KS);
+    for(int i=0; i<SAMPDIM; ++i)
+    {
+        float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
+
+        blue_noise.push_back(n);
+        for(int y=0; y<KS; ++y)
+        {
+            for(int x=0; x<KS; ++x)
+            {
+                prefilter_data.push_back(prefilter(x+n.x-1.5)*
+                                         prefilter(y+n.y-1.5)/SAMPDIM);
+            }
+        }
+    }
+
+    copy_to_symbol("blue_noise",blue_noise);
+    copy_to_symbol("prefilter_data",prefilter_data);
+}
+
 template<int C> 
 filter_plan *
 filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{{{*/
@@ -285,27 +311,16 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     plan->temp_image.resize(img.width(), img.height());
 
-    std::vector<float2> blue_noise;
-    std::vector<float> bspline3_data;
-    blue_noise.reserve(SAMPDIM);
-    bspline3_data.reserve(SAMPDIM*KS*KS);
-    for(int i=0; i<SAMPDIM; ++i)
+    switch(op.pre_filter)
     {
-        float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
-
-        blue_noise.push_back(n);
-        for(int y=0; y<KS; ++y)
-        {
-            for(int x=0; x<KS; ++x)
-            {
-                bspline3_data.push_back(bspline3(x+n.x-1.5)*
-                                        bspline3(y+n.y-1.5)/SAMPDIM);
-            }
-        }
+    case FILTER_BSPLINE3:
+    case FILTER_CARDINAL_BSPLINE3:
+        init_pre_filter(&bspline3);
+        break;
+    case FILTER_MITCHELL_NETRAVALI:
+        init_pre_filter(&mitchell_netravali);
+        break;
     }
-
-    copy_to_symbol("blue_noise",blue_noise);
-    copy_to_symbol("bspline3_data",bspline3_data);
 
     switch(op.type)
     {
@@ -385,7 +400,7 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f+0.5f;
 
-    float *bspline3 = bspline3_data;
+    float *bspline3 = prefilter_data;
 
     S sampler;
 
@@ -589,6 +604,9 @@ void filter(filter_plan *plan, dimage_ptr<float,C> out, const filter_operation &
     case FILTER_BSPLINE3:
     case FILTER_CARDINAL_BSPLINE3:
         filter<bspline3_weights, C>(plan, out, op);
+        break;
+    case FILTER_MITCHELL_NETRAVALI:
+        filter<mitchell_netravali_weights, C>(plan, out, op);
         break;
     default:
         assert(false);

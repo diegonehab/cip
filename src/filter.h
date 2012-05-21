@@ -34,7 +34,8 @@ enum effect_type
 enum filter_type
 {
     FILTER_BSPLINE3,
-    FILTER_CARDINAL_BSPLINE3
+    FILTER_CARDINAL_BSPLINE3,
+    FILTER_MITCHELL_NETRAVALI
 };
 
 enum filter_flags

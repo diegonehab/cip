@@ -193,6 +193,8 @@ void recfilter5(recfilter5_plan_R<R> &plan,float *d_output,const float *d_input)
 
 void recfilter5(recfilter5_plan *plan, float *d_output, const float *d_input)
 {
+    assert(plan);
+
     if(recfilter5_plan_R<1> *plan_R = dynamic_cast<recfilter5_plan_R<1>*>(plan))
         recfilter5(*plan_R, d_output, d_input);
     else if(recfilter5_plan_R<2> *plan_R = dynamic_cast<recfilter5_plan_R<2>*>(plan))
