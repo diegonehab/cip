@@ -61,11 +61,16 @@ public:
         MainFrameUI::show();
         if(m_image_frame)
             m_image_frame->show();
+
+        if(m_image_frame_box)
+            m_image_frame_box->show();
     }
     virtual void hide()
     {
         if(m_image_frame)
             m_image_frame->hide();
+        if(m_image_frame_box)
+            m_image_frame_box->hide();
         MainFrameUI::hide();
     }
 
@@ -93,6 +98,7 @@ private:
 
     Fl_Group *m_param_panel; // current effect parameter panel
     ImageFrame *m_image_frame; 
+    ImageFrame *m_image_frame_box; 
 };
 
 MainFrame::MainFrame()
@@ -100,6 +106,7 @@ MainFrame::MainFrame()
     , m_render_thread((void(*)(void*))&MainFrame::render_thread, this, false)
     , m_param_panel(NULL)
     , m_image_frame(NULL)
+    , m_image_frame_box(NULL)
     , m_terminate_thread(false)
     , m_has_new_render_job(false)
 {
@@ -145,7 +152,7 @@ filter_operation MainFrame::get_filter_operation() const
 {
     filter_operation op;
 
-    op.use_supersampling = false;
+    op.use_supersampling = true;
 
     op.type = (effect_type)(ptrdiff_t)m_effects->mvalue()->user_data_;
 
@@ -252,34 +259,45 @@ void show_error(std::string *data)
 
 void *MainFrame::render_thread(MainFrame *frame)
 {
-    filter_plan *plan = NULL;
+    filter_plan *plan = NULL, *plan_box = NULL;
 
     try
     {
-        ImageFrame *imgframe = frame->m_image_frame;
+        ImageFrame *imgframe = frame->m_image_frame,
+                   *imgframe_box = frame->m_image_frame_box;
 
-        filter_operation op = frame->get_filter_operation();
+        filter_operation op = frame->get_filter_operation(),
+                         op_box = op;
+        op_box.use_supersampling = false;
+        op_box.pre_filter = op_box.post_filter = FILTER_BOX;
 
         bool grayscale = frame->m_grayscale->value();
 
         if(grayscale)
+        {
             plan = filter_create_plan(imgframe->get_grayscale_input(), op);
+            plan_box = filter_create_plan(imgframe_box->get_grayscale_input(), op_box);
+        }
         else
+        {
             plan = filter_create_plan(imgframe->get_input(), op);
+            plan_box = filter_create_plan(imgframe_box->get_input(), op_box);
+        }
 
         while(!frame->m_terminate_thread)
         {
             rod::unique_lock lk(frame->m_mtx_render_data);
 
             // no render job? sleep
-            if(imgframe == NULL || !frame->m_has_new_render_job)
+            if(imgframe_box == NULL || imgframe == NULL || !frame->m_has_new_render_job)
                 frame->m_wakeup.wait(lk);
 
             // maybe it was set during wait
             imgframe = frame->m_image_frame;
+            imgframe_box = frame->m_image_frame_box;
 
-            if(!frame->m_terminate_thread && imgframe != NULL &&
-               frame->m_has_new_render_job)
+            if(!frame->m_terminate_thread && imgframe_box != NULL &&
+               imgframe!=NULL && frame->m_has_new_render_job)
             {
                 // fill the operation struct along with its parameters based
                 // on what is set by the user
@@ -287,23 +305,52 @@ void *MainFrame::render_thread(MainFrame *frame)
 
                 lk.unlock();
 
-                // lock buffers since we'll write on them
-                ImageFrame::OutputBufferLocker lkbuffers(*imgframe);
+                double elapsed;
 
-                filter_operation op = frame->get_filter_operation();
+                // supersampling
+                {
+                    // lock buffers since we'll write on them
+                    ImageFrame::OutputBufferLocker lkbuffers(*imgframe);
 
-                gpu_timer timer;
+                    filter_operation op = frame->get_filter_operation();
 
-                // just process one (grayscale) channel?
-                if(grayscale)
-                    filter(plan, imgframe->get_grayscale_output(), op);
-                else
-                    filter(plan, imgframe->get_output(), op);
+                    gpu_timer timer;
 
-                timer.stop();
+                    // just process one (grayscale) channel?
+                    if(grayscale)
+                        filter(plan, imgframe->get_grayscale_output(), op);
+                    else
+                        filter(plan, imgframe->get_output(), op);
 
-                // done working with buffers, release the lock
-                lkbuffers.unlock();
+                    timer.stop();
+                    elapsed = timer.elapsed();
+
+                    // done working with buffers, release the lock
+                    lkbuffers.unlock();
+                }
+
+                // box
+                {
+                    // lock buffers since we'll write on them
+                    ImageFrame::OutputBufferLocker lkbuffers(*imgframe_box);
+
+                    filter_operation op = frame->get_filter_operation();
+                    op.use_supersampling = false;
+                    op.pre_filter = op.post_filter = FILTER_BOX;
+
+//                    gpu_timer timer;
+
+                    // just process one (grayscale) channel?
+                    if(grayscale)
+                        filter(plan_box, imgframe_box->get_grayscale_output(), op);
+                    else
+                        filter(plan_box, imgframe_box->get_output(), op);
+
+  //                  timer.stop();
+
+                    // done working with buffers, release the lock
+                    lkbuffers.unlock();
+                }
 
                 // avoids a deadlock in Fl::lock() because usually we're
                 // destroying the main window if terminate_thread is true
@@ -315,12 +362,12 @@ void *MainFrame::render_thread(MainFrame *frame)
                 // performance counters
                 Fl::lock();
 
-                frame->m_status_fps->value(1.0/timer.elapsed());
+                frame->m_status_fps->value(1.0/elapsed);
 
                 int imgsize = imgframe->get_output().width() *
                               imgframe->get_output().height();
 
-                float rate = imgsize / timer.elapsed();
+                float rate = imgsize / elapsed;
                 std::string srate = unit_value(rate, 1000), unit;
                 {
                     std::istringstream ss(srate);
@@ -331,6 +378,7 @@ void *MainFrame::render_thread(MainFrame *frame)
                 frame->m_status_rate->value(rate);
 
                 imgframe->swap_buffers();
+                imgframe_box->swap_buffers();
                 Fl::unlock();
                 Fl::awake((void *)NULL); // awake message loop processing
             }
@@ -356,6 +404,9 @@ void MainFrame::on_change_grayscale(bool gs)
     if(m_image_frame)
         m_image_frame->set_grayscale(gs);
 
+    if(m_image_frame_box)
+        m_image_frame_box->set_grayscale(gs);
+
     // must preprocess input image again
     restart_render_thread();
 
@@ -380,6 +431,9 @@ void MainFrame::open(const std::string &fname)
     if(!m_image_frame)
         m_image_frame = new ImageFrame();
 
+    if(!m_image_frame_box)
+        m_image_frame_box = new ImageFrame();
+
     dimage<uchar3> img_byte3;
     img_byte3.copy_from_host(&imgdata[0], width, height);
 
@@ -387,8 +441,10 @@ void MainFrame::open(const std::string &fname)
     convert(&img_float3, &img_byte3);
 
     m_image_frame->set_input_image(&img_float3);
+    m_image_frame->copy_label(("Supersampling: "+fname).c_str());
 
-    m_image_frame->copy_label(fname.c_str());
+    m_image_frame_box->set_input_image(&img_float3);
+    m_image_frame_box->copy_label(("Point Sampling: "+fname).c_str());
 
     restart_render_thread();
 }
