@@ -555,7 +555,11 @@ void MainFrame::on_choose_effect(effect_type effect)
     }
 
     if(m_param_panel)
+    {
+        m_param_panel->hide();
+        m_param_group->remove(*m_param_panel);
         delete m_param_panel;
+    }
     m_param_panel = panel;
 
     m_param_group->end();
