@@ -71,7 +71,7 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
     case EFFECT_ROOT:
         return root(sampler(pos),filter_op.degree);
     case EFFECT_THRESHOLD:
-        return threshold(sampler(pos),filter_op.threshold);
+        return threshold(sampler(pos),filter_op.minimum, filter_op.maximum);
     case EFFECT_REPLACEMENT:
         return replacement(sampler(pos), 
                            filter_op.old_color, 

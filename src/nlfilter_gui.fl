@@ -117,12 +117,16 @@ widget_class ParamRootUI {open
 } 
 
 widget_class ParamThresholdUI {open
-  xywh {1126 828 355 100} type Double hide
-  class Fl_Group
+  xywh {1126 828 355 100} type Double
+  class Fl_Group visible
 } {
-  Fl_Value_Slider threshold {
-    label {Threshold:}
+  Fl_Value_Slider minimum {
+    label {minimum:}
     xywh {85 10 265 25} type {Horz Knob} align 4 value 0.5
+  }
+  Fl_Value_Slider maximum {
+    label {maximum:} selected
+    xywh {85 42 265 25} type {Horz Knob} align 4 value 1
   }
 } 
 
@@ -209,11 +213,11 @@ widget_class ParamHueSaturationLightnessUI {open
 } 
 
 widget_class ParamUnsharpMaskUI {open
-  xywh {736 789 355 100} type Double
-  class Fl_Group visible
+  xywh {736 789 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Value_Slider radius {
-    label {radius:} selected
+    label {radius:}
     xywh {80 4 270 25} type {Horz Knob} align 4 maximum 10 value 1
   }
   Fl_Value_Slider amount {
@@ -241,8 +245,8 @@ widget_class ParamBilateralUI {open
 } 
 
 widget_class ParamEmbossUI {open
-  xywh {923 906 355 100} type Double
-  class Fl_Group visible
+  xywh {923 906 355 100} type Double hide
+  class Fl_Group
 } {
   Fl_Value_Slider amount {
     label {amount:}

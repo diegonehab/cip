@@ -90,15 +90,17 @@ T posterize(T v, int levels)
 // threshold ------------------------------------------------------------
 
 __device__ inline 
-float threshold(float v, float a)
+float threshold(float v, float amin, float amax)
 {
-    return v < a ? 0 : 1;
+    return v < amin || v > amax ? 0 : 1;
 }
 
 __device__ inline 
-float3 threshold(float3 v, float a)
+float3 threshold(float3 v, float amin, float amax)
 {
-    return make_float3(threshold(v.x, a), threshold(v.y, a), threshold(v.z, a));
+    return make_float3(threshold(v.x, amin,amax), 
+                       threshold(v.y, amin,amax), 
+                       threshold(v.z, amin,amax));
 }
 
 // grayscale  ------------------------------------------------------------

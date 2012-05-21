@@ -160,7 +160,10 @@ filter_operation MainFrame::get_filter_operation() const
     else if(const ParamRootUI *panel = dynamic_cast<const ParamRootUI *>(m_param_panel))
         op.degree = panel->degree->value();
     else if(const ParamThresholdUI *panel = dynamic_cast<const ParamThresholdUI *>(m_param_panel))
-        op.threshold = panel->threshold->value();
+    {
+        op.minimum = panel->minimum->value();
+        op.maximum = panel->maximum->value();
+    }
     else if(const ParamLaplaceEdgeEnhancementUI *panel = dynamic_cast<const ParamLaplaceEdgeEnhancementUI *>(m_param_panel))
         op.multiple = panel->multiple->value();
     else if(const ParamYaroslavskyBilateralUI *panel = dynamic_cast<const ParamYaroslavskyBilateralUI *>(m_param_panel))
@@ -470,7 +473,8 @@ void MainFrame::on_choose_effect(effect_type effect)
     case EFFECT_THRESHOLD:
         {
             ParamThresholdUI *_panel = new ParamThresholdUI(0,0,pw,ph);
-            _panel->threshold->callback(on_param_changed, this);
+            _panel->minimum->callback(on_param_changed, this);
+            _panel->maximum->callback(on_param_changed, this);
             panel = _panel;
         }
         break;
@@ -640,7 +644,10 @@ filter_operation parse_filter_operation(const std::string &spec)
     else if(opname == "threshold")
     {
         op.type = EFFECT_THRESHOLD;
-        ss >> op.threshold;
+        char c;
+        ss >> op.minimum >> c >> op.maximum;
+        if(c != ',')
+            ss.setstate(std::ios::failbit);
     }
     else if(opname == "yaroslavsky_bilateral")
     {
@@ -738,7 +745,7 @@ void print_help(const char *progname)
             "  - scale[value]\n"
             "  - bias[value]\n"
             "  - root[degree]\n"
-            "  - threshold[value]\n"
+            "  - threshold[min,max]\n"
             "  - replacement[old_r,old_g,old_b,new_r,new_g,new_b,tau_r,tau_g,tau_b]\n"
             "  - gradient_edge_detection[]\n"
             "  - laplacian[]\n"

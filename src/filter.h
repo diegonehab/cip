@@ -67,7 +67,10 @@ struct filter_operation
         float degree;
 
         // threshold
-        float threshold;
+        struct
+        {
+            float minimum, maximum;
+        };
 
         // replacement
         struct
@@ -99,7 +102,7 @@ struct filter_operation
         // unsharp mask
         struct
         {
-            float dummy, // will use threshold above
+            float threshold,
                   amount, sigma;
         };
 
