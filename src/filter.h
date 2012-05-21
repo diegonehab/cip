@@ -52,6 +52,8 @@ struct filter_operation
 
     filter_type pre_filter, post_filter;
 
+    bool use_supersampling;
+
     union
     {
         // posterize

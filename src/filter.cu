@@ -361,7 +361,7 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
 #endif
-void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
+void filter_kernel_ss1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -449,7 +449,87 @@ __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
 #endif
-void filter_kernel_box(dimage_ptr<float,C> out)/*{{{*/
+void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
+{
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int x = blockIdx.x*BW_F1+tx, y = blockIdx.y*BH_F1+ty;
+
+    if(!out.is_inside(x,y))
+        return;
+
+    // output will point to the pixel we're processing now
+    int idx = out.offset_at(x,y);
+    out += idx;
+
+    // we're using some smem as registers not to blow up the register space,
+    // here we define how much 'registers' are in smem, the rest is used
+    // in regular registers
+    
+    typedef filter_traits<C> cfg;
+
+    typedef typename sum_traits<C>::type sum_type;
+    typedef typename pixel_traits<float,C>::pixel_type pixel_type;
+
+    const int SMEM_SIZE = cfg::smem_size,
+              REG_SIZE = KS*KS-SMEM_SIZE;
+
+    __shared__ sum_type _sum[BH_F1][SMEM_SIZE][BW_F1];
+    sum_type (*ssum)[BW_F1] = (sum_type (*)[BW_F1]) &_sum[ty][0][tx];
+
+    sum_type sum[REG_SIZE];
+
+    // Init registers to zero
+    for(int i=0; i<REG_SIZE; ++i)
+        sum[i] = sum_traits<C>::make_pixel(0);
+
+#pragma unroll
+    for(int i=0; i<SMEM_SIZE; ++i)
+        *ssum[i] = sum_traits<C>::make_pixel(0);
+
+    // top-left position of the kernel support
+    float2 p = make_float2(x,y)-1.5f+0.5f;
+
+    float *bspline3 = prefilter_data;
+
+    S sampler;
+
+    pixel_type value = do_filter<OP>(sampler, p);
+    value = srgb2lrgb(value);
+
+    // scans through the kernel support, collecting data for each position
+#pragma unroll
+    for(int i=0; i<SMEM_SIZE; ++i)
+    {
+        float wij = bspline3[i];
+
+        *ssum[i] += sum_traits<C>::make_pixel(value*wij, wij);
+    }
+    bspline3 += SMEM_SIZE;
+#pragma unroll
+    for(int i=0; i<REG_SIZE; ++i)
+    {
+        float wij = bspline3[i];
+
+        sum[i] += sum_traits<C>::make_pixel(value*wij, wij);
+    }
+
+    // writes out to gmem what's in the registers
+#pragma unroll
+    for(int i=0; i<SMEM_SIZE; ++i)
+        *out[i] = *ssum[i];
+
+#pragma unroll
+    for(int i=0; i<REG_SIZE; ++i)
+        *out[SMEM_SIZE+i] = sum[i];
+}/*}}}*/
+
+template <class S, effect_type OP,int C>
+__global__
+#if USE_LAUNCH_BOUNDS
+__launch_bounds__(BW_F1*BH_F1, NB_F1)
+#endif
+void filter_kernel_box_ss(dimage_ptr<float,C> out)/*{{{*/
 {
     int tx = threadIdx.x, ty = threadIdx.y;
 
@@ -489,6 +569,41 @@ void filter_kernel_box(dimage_ptr<float,C> out)/*{{{*/
     }
 
     *out = sum/float(SAMPDIM);
+}/*}}}*/
+
+template <class S, effect_type OP,int C>
+__global__
+#if USE_LAUNCH_BOUNDS
+__launch_bounds__(BW_F1*BH_F1, NB_F1)
+#endif
+void filter_kernel_box(dimage_ptr<float,C> out)/*{{{*/
+{
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int x = blockIdx.x*BW_F1+tx, y = blockIdx.y*BH_F1+ty;
+
+    if(!out.is_inside(x,y))
+        return;
+
+    // output will point to the pixel we're processing now
+    int idx = out.offset_at(x,y);
+    out += idx;
+
+    // we're using some smem as registers not to blow up the register space,
+    // here we define how much 'registers' are in smem, the rest is used
+    // in regular registers
+    
+    typedef filter_traits<C> cfg;
+
+    typedef typename sum_traits<C>::type sum_type;
+    typedef typename pixel_traits<float,C>::pixel_type pixel_type;
+
+    // top-left position of the kernel support
+    float2 p = make_float2(x,y)+0.5f;
+
+    S sampler;
+
+    *out = do_filter<OP>(sampler, p);
 }/*}}}*/
 
 template <int C>
@@ -563,9 +678,19 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         if(plan->flags & VERBOSE)\
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");\
         if(op.pre_filter == FILTER_BOX) \
-            filter_kernel_box<POST_FILTER,EFFECT><<<gdim, bdim>>>(out); \
+        { \
+            if(op.use_supersampling) \
+                filter_kernel_box_ss<POST_FILTER,EFFECT><<<gdim, bdim>>>(out); \
+            else \
+                filter_kernel_box<POST_FILTER,EFFECT><<<gdim, bdim>>>(out); \
+        } \
         else \
-            filter_kernel1<POST_FILTER,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+        { \
+            if(op.use_supersampling) \
+                filter_kernel_ss1<POST_FILTER,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+            else \
+                filter_kernel1<POST_FILTER,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+        }\
         if(timer)\
             timer->stop();\
         break
@@ -611,9 +736,19 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
 
         if(op.pre_filter == FILTER_BOX)
-            filter_kernel_box<POST_FILTER,EFFECT_UNSHARP_MASK><<<gdim, bdim>>>(out);
+        {
+            if(op.use_supersampling)
+                filter_kernel_box_ss<POST_FILTER,EFFECT_UNSHARP_MASK><<<gdim, bdim>>>(out);
+            else
+                filter_kernel_box<POST_FILTER,EFFECT_UNSHARP_MASK><<<gdim, bdim>>>(out);
+        }
         else
-            filter_kernel1<POST_FILTER,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+        {
+            if(op.use_supersampling)
+                filter_kernel_ss1<POST_FILTER,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+            else
+                filter_kernel1<POST_FILTER,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+        }
 
         if(timer)
             timer->stop();

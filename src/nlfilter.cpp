@@ -145,6 +145,8 @@ filter_operation MainFrame::get_filter_operation() const
 {
     filter_operation op;
 
+    op.use_supersampling = false;
+
     op.type = (effect_type)(ptrdiff_t)m_effects->mvalue()->user_data_;
 
     op.pre_filter = (filter_type)(ptrdiff_t)m_pre_filter->mvalue()->user_data_;
@@ -609,6 +611,8 @@ filter_operation parse_filter_operation(const std::string &spec)
         throw std::runtime_error("Syntax error on effect specification");
 
     filter_operation op;
+
+    op.use_supersampling = true;
 
     if(opname == "identity")
         op.type = EFFECT_IDENTITY;
