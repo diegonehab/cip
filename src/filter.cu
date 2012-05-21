@@ -439,6 +439,49 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
         *out[SMEM_SIZE+i] = sum[i];
 }/*}}}*/
 
+template <class S, effect_type OP,int C>
+__global__
+#if USE_LAUNCH_BOUNDS
+__launch_bounds__(BW_F1*BH_F1, NB_F1)
+#endif
+void filter_kernel_box(dimage_ptr<float,C> out)/*{{{*/
+{
+    int tx = threadIdx.x, ty = threadIdx.y;
+
+    int x = blockIdx.x*BW_F1+tx, y = blockIdx.y*BH_F1+ty;
+
+    if(!out.is_inside(x,y))
+        return;
+
+    // output will point to the pixel we're processing now
+    int idx = out.offset_at(x,y);
+    out += idx;
+
+    // we're using some smem as registers not to blow up the register space,
+    // here we define how much 'registers' are in smem, the rest is used
+    // in regular registers
+    
+    typedef filter_traits<C> cfg;
+
+    typedef typename sum_traits<C>::type sum_type;
+    typedef typename pixel_traits<float,C>::pixel_type pixel_type;
+
+    pixel_type sum = pixel_traits<float,C>::make_pixel(0);
+
+    // top-left position of the kernel support
+    float2 p = make_float2(x,y)+0.5f;
+
+    S sampler;
+
+    for(int s=0; s<SAMPDIM; ++s)
+    {
+        pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
+        sum += srgb2lrgb(value);
+    }
+
+    *out = sum/float(SAMPDIM);
+}/*}}}*/
+
 template <int C>
 __global__
 #if USE_LAUNCH_BOUNDS
@@ -510,7 +553,10 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     case EFFECT:\
         if(plan->flags & VERBOSE)\
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");\
-        filter_kernel1<sampler,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+        if(op.pre_filter == FILTER_BOX) \
+            filter_kernel_box<sampler,EFFECT><<<gdim, bdim>>>(out); \
+        else \
+            filter_kernel1<sampler,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
         if(timer)\
             timer->stop();\
         break
@@ -555,7 +601,10 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
 
-        filter_kernel1<sampler,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+        if(op.pre_filter == FILTER_BOX)
+            filter_kernel_box<sampler,EFFECT_UNSHARP_MASK><<<gdim, bdim>>>(out);
+        else
+            filter_kernel1<sampler,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
 
         if(timer)
             timer->stop();
@@ -567,6 +616,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     }
 #undef CASE
                    
+    if(op.pre_filter != FILTER_BOX)
     {
         if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("Second pass",out.width()*out.height(),"P");

@@ -124,6 +124,7 @@ MainFrame::MainFrame()
     m_pre_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
     m_pre_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
     m_pre_filter->add("Michell-Netravali",0,NULL,(void*)FILTER_MITCHELL_NETRAVALI);
+    m_pre_filter->add("Box",0,NULL,(void*)FILTER_BOX);
     m_pre_filter->value(1);
     m_pre_filter->callback((Fl_Callback *)&MainFrame::on_filter_changed, this);
 
@@ -717,6 +718,8 @@ filter_type parse_filter_type(const std::string &name)
         return FILTER_CARDINAL_BSPLINE3;
     else if(name == "mitchell-netravali")
         return FILTER_MITCHELL_NETRAVALI;
+    else if(name == "box")
+        return FILTER_BOX;
     else
         throw std::runtime_error("Bad filter type");
 }
@@ -747,6 +750,7 @@ void print_help(const char *progname)
             "  - bspline3\n"
             "  - card-bspline3\n"
             "  - mitchell-netravali\n"
+            "  - box\n"
             "\n"
             "without -o, shows a GUI\n";
 }
