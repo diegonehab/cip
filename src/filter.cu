@@ -5,7 +5,7 @@
 #include "symbol.h"
 #include "image_util.h"
 #include "blue_noise.h"
-#include "sampler.h"
+#include "cubic_sampler.h"
 #include "bspline3.h"
 #include "mitchell_netravali.h"
 #include "recfilter.h"
@@ -545,7 +545,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     dim3 bdim(BW_F1,BH_F1),
          gdim((out.width()+bdim.x-1)/bdim.x, (out.height()+bdim.y-1)/bdim.y);
 
-    typedef filtered_sampler<POST_FILTER, typename cfg::texfetch_type> sampler;
+    typedef cubic_sampler<POST_FILTER, typename cfg::texfetch_type> sampler;
 
     base_timer *timer = NULL;
 
