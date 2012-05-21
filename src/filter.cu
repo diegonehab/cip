@@ -545,7 +545,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     dim3 bdim(BW_F1,BH_F1),
          gdim((out.width()+bdim.x-1)/bdim.x, (out.height()+bdim.y-1)/bdim.y);
 
-    typedef cubic_sampler<POST_FILTER, typename cfg::texfetch_type> sampler;
+    typedef filter_traits<C> cfg;
 
     base_timer *timer = NULL;
 
@@ -554,9 +554,9 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         if(plan->flags & VERBOSE)\
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");\
         if(op.pre_filter == FILTER_BOX) \
-            filter_kernel_box<sampler,EFFECT><<<gdim, bdim>>>(out); \
+            filter_kernel_box<POST_FILTER,EFFECT><<<gdim, bdim>>>(out); \
         else \
-            filter_kernel1<sampler,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+            filter_kernel1<POST_FILTER,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
         if(timer)\
             timer->stop();\
         break
@@ -602,9 +602,9 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
 
         if(op.pre_filter == FILTER_BOX)
-            filter_kernel_box<sampler,EFFECT_UNSHARP_MASK><<<gdim, bdim>>>(out);
+            filter_kernel_box<POST_FILTER,EFFECT_UNSHARP_MASK><<<gdim, bdim>>>(out);
         else
-            filter_kernel1<sampler,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+            filter_kernel1<POST_FILTER,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
 
         if(timer)
             timer->stop();
@@ -651,14 +651,17 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
 template <int C>
 void filter(filter_plan *plan, dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
 {
+    typedef filter_traits<C> cfg;
+    typedef typename cfg::texfetch_type texfetch;
+
     switch(op.post_filter)
     {
     case FILTER_BSPLINE3:
     case FILTER_CARDINAL_BSPLINE3:
-        filter<bspline3_weights, C>(plan, out, op);
+        filter<cubic_sampler<bspline3_weights, texfetch>,C>(plan, out, op);
         break;
     case FILTER_MITCHELL_NETRAVALI:
-        filter<mitchell_netravali_weights, C>(plan, out, op);
+        filter<cubic_sampler<mitchell_netravali_weights,texfetch>, C>(plan, out, op);
         break;
     default:
         assert(false);
