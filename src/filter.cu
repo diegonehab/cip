@@ -195,31 +195,6 @@ struct filter_plan_C : filter_plan
     dimage<typename sum_traits<C>::type,KS*KS> temp_image;
 };
 
-void init_blue_noise()/*{{{*/
-{
-    std::vector<float2> blue_noise;
-    std::vector<float> bspline3_data;
-    blue_noise.reserve(SAMPDIM);
-    bspline3_data.reserve(SAMPDIM*KS*KS);
-    for(int i=0; i<SAMPDIM; ++i)
-    {
-        float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
-
-        blue_noise.push_back(n);
-        for(int y=0; y<KS; ++y)
-        {
-            for(int x=0; x<KS; ++x)
-            {
-                bspline3_data.push_back(bspline3(x+n.x-1.5)*
-                                        bspline3(y+n.y-1.5)/SAMPDIM);
-            }
-        }
-    }
-
-    copy_to_symbol("blue_noise",blue_noise);
-    copy_to_symbol("bspline3_data",bspline3_data);
-}/*}}}*/
-
 template<int C>
 void copy_to_array(cudaArray *out, dimage_ptr<const float,C> in);
 
@@ -310,7 +285,27 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     plan->temp_image.resize(img.width(), img.height());
 
-    init_blue_noise();
+    std::vector<float2> blue_noise;
+    std::vector<float> bspline3_data;
+    blue_noise.reserve(SAMPDIM);
+    bspline3_data.reserve(SAMPDIM*KS*KS);
+    for(int i=0; i<SAMPDIM; ++i)
+    {
+        float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
+
+        blue_noise.push_back(n);
+        for(int y=0; y<KS; ++y)
+        {
+            for(int x=0; x<KS; ++x)
+            {
+                bspline3_data.push_back(bspline3(x+n.x-1.5)*
+                                        bspline3(y+n.y-1.5)/SAMPDIM);
+            }
+        }
+    }
+
+    copy_to_symbol("blue_noise",blue_noise);
+    copy_to_symbol("bspline3_data",bspline3_data);
 
     switch(op.type)
     {
