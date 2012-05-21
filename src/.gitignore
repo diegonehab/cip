@@ -6,3 +6,8 @@ nlfilter
 nlfilter_gui.cxx
 nlfilter_gui.h
 *.swp
+memcheck
+*.cvp
+*.xml
+output*
+*.o
