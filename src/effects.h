@@ -434,13 +434,13 @@ float hue_saturation_lightness(float v, float hue, float saturation,
 __device__ inline
 float3 unsharp_mask(float3 v, float blurred_vy, float amount, float threshold)
 {
-    float3 v_yiq = rgb2yiq(v);
+    float3 v_yiq = rgb2yiq(srgb2lrgb(v));
 
     float dy = v_yiq.x - blurred_vy;
 
     v_yiq.x += v_yiq.x*amount*(dy < threshold ? dy*dy : dy);
 
-    return yiq2rgb(v_yiq);
+    return lrgb2srgb(yiq2rgb(v_yiq));
 }
 
 __device__ inline
