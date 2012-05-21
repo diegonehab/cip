@@ -1,5 +1,12 @@
 #include "util.h"
 
+const float blue_noise1_x[1] = {/*{{{*/
+    0
+};/*}}}*/
+const float blue_noise1_y[1] = {/*{{{*/
+    0
+};/*}}}*/
+
 const float blue_noise8_x[8] = {/*{{{*/
     -0.266471f, 0.353688f, -0.401679f, 0.488846f,
     0.122459f, -0.0344567f, -0.139007f, 0.207413f,

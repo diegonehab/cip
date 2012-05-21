@@ -408,7 +408,11 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
 
     for(int s=0; s<SAMPDIM; ++s)
     {
+#if SAMPDIM==1
+        pixel_type value = do_filter<OP>(sampler, p);
+#else
         pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
+#endif
         value = srgb2lrgb(value);
 
         // scans through the kernel support, collecting data for each position
@@ -476,7 +480,11 @@ void filter_kernel_box(dimage_ptr<float,C> out)/*{{{*/
 
     for(int s=0; s<SAMPDIM; ++s)
     {
+#if SAMPDIM == 1
+        pixel_type value = do_filter<OP>(sampler, p);
+#else
         pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
+#endif
         sum += srgb2lrgb(value);
     }
 
