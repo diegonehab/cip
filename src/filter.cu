@@ -5,7 +5,9 @@
 #include "symbol.h"
 #include "image_util.h"
 #include "blue_noise.h"
-#include "bspline3_sampler.h"
+#include "sampler.h"
+#include "bspline3.h"
+#include "mitchell_netravali.h"
 #include "recfilter.h"
 #if CUDA_SM < 20
 #   include "cuPrintf.cu"
@@ -16,11 +18,7 @@
 
 #define USE_LAUNCH_BOUNDS 1
 const int BW_F1 = 32, // cuda block width
-#if SAMPDIM == 8
           BH_F1 = 8; 
-#else
-          BH_F1 = 16;
-#endif
 
 const int BW_F2 = 32,
           BH_F2 = 8; 
@@ -37,7 +35,7 @@ const int
 
 __constant__ float2 blue_noise[SAMPDIM];
 
-__constant__ float bspline3_data[SAMPDIM*KS*KS];
+__constant__ float prefilter_data[SAMPDIM*KS*KS];
 
 texture<float, 2, cudaReadModeElementType> t_aux_float;
 
@@ -57,7 +55,7 @@ __constant__ filter_operation filter_op;
 template <effect_type OP, class S>
 __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
-    bspline3_sampler<texfetch_aux_float> sampler_aux_float;
+    typename S::template rebind_sampler<texfetch_aux_float>::type sampler_aux_float;
     
     typedef typename S::result_type result_type;
 
@@ -192,12 +190,15 @@ struct filter_plan_C : filter_plan
     dimage<typename sum_traits<C>::type,KS*KS> temp_image;
 };
 
-void init_blue_noise()/*{{{*/
+template<int C>
+void copy_to_array(cudaArray *out, dimage_ptr<const float,C> in);
+
+void init_pre_filter(float (*prefilter)(float))
 {
     std::vector<float2> blue_noise;
-    std::vector<float> bspline3_data;
+    std::vector<float> prefilter_data;
     blue_noise.reserve(SAMPDIM);
-    bspline3_data.reserve(SAMPDIM*KS*KS);
+    prefilter_data.reserve(SAMPDIM*KS*KS);
     for(int i=0; i<SAMPDIM; ++i)
     {
         float2 n = make_float2(blue_noise_x[i], blue_noise_y[i]);
@@ -207,18 +208,15 @@ void init_blue_noise()/*{{{*/
         {
             for(int x=0; x<KS; ++x)
             {
-                bspline3_data.push_back(bspline3(x+n.x-1.5)*
-                                        bspline3(y+n.y-1.5)/SAMPDIM);
+                prefilter_data.push_back(prefilter(x+n.x-1.5)*
+                                         prefilter(y+n.y-1.5)/SAMPDIM);
             }
         }
     }
 
     copy_to_symbol("blue_noise",blue_noise);
-    copy_to_symbol("bspline3_data",bspline3_data);
-}/*}}}*/
-
-template<int C>
-void copy_to_array(cudaArray *out, dimage_ptr<const float,C> in);
+    copy_to_symbol("prefilter_data",prefilter_data);
+}
 
 template<int C> 
 filter_plan *
@@ -307,7 +305,16 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     plan->temp_image.resize(img.width(), img.height());
 
-    init_blue_noise();
+    switch(op.pre_filter)
+    {
+    case FILTER_BSPLINE3:
+    case FILTER_CARDINAL_BSPLINE3:
+        init_pre_filter(&bspline3);
+        break;
+    case FILTER_MITCHELL_NETRAVALI:
+        init_pre_filter(&mitchell_netravali);
+        break;
+    }
 
     switch(op.type)
     {
@@ -341,7 +348,7 @@ void free(filter_plan *plan)/*{{{*/
     delete plan;
 }/*}}}*/
 
-template <effect_type OP,int C>
+template <class S, effect_type OP,int C>
 __global__
 #if USE_LAUNCH_BOUNDS
 __launch_bounds__(BW_F1*BH_F1, NB_F1)
@@ -387,9 +394,9 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f+0.5f;
 
-    float *bspline3 = bspline3_data;
+    float *bspline3 = prefilter_data;
 
-    bspline3_sampler<typename cfg::texfetch_type> sampler;
+    S sampler;
 
     for(int s=0; s<SAMPDIM; ++s)
     {
@@ -468,7 +475,7 @@ void filter_kernel2(dimage_ptr<float,C> out, /*{{{*/
     *out = filter_traits<C>::normalize_sum(sum);
 }/*}}}*/
 
-template <int C>
+template <class POST_FILTER, int C>
 void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
 {
     filter_plan_C<C> *plan = dynamic_cast<filter_plan_C<C> *>(_plan);
@@ -488,13 +495,15 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     dim3 bdim(BW_F1,BH_F1),
          gdim((out.width()+bdim.x-1)/bdim.x, (out.height()+bdim.y-1)/bdim.y);
 
+    typedef filtered_sampler<POST_FILTER, typename cfg::texfetch_type> sampler;
+
     base_timer *timer = NULL;
 
 #define CASE(EFFECT) \
     case EFFECT:\
         if(plan->flags & VERBOSE)\
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");\
-        filter_kernel1<EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
+        filter_kernel1<sampler,EFFECT,C><<<gdim, bdim>>>(&plan->temp_image); \
         if(timer)\
             timer->stop();\
         break
@@ -538,7 +547,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
         if(plan->flags & VERBOSE)
             timer = &timers.gpu_add("First pass",out.width()*out.height(),"P");
 
-        filter_kernel1<EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
+        filter_kernel1<sampler,EFFECT_UNSHARP_MASK,C><<<gdim, bdim>>>(&plan->temp_image);
 
         if(timer)
             timer->stop();
@@ -580,6 +589,23 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     // maps back to gamma space
     lrgb2srgb(out, out);
 }/*}}}*/
+
+template <int C>
+void filter(filter_plan *plan, dimage_ptr<float,C> out, const filter_operation &op)/*{{{*/
+{
+    switch(op.post_filter)
+    {
+    case FILTER_BSPLINE3:
+    case FILTER_CARDINAL_BSPLINE3:
+        filter<bspline3_weights, C>(plan, out, op);
+        break;
+    case FILTER_MITCHELL_NETRAVALI:
+        filter<mitchell_netravali_weights, C>(plan, out, op);
+        break;
+    default:
+        assert(false);
+    }
+}
 
 // Grayscale filtering ===================================================/*{{{*/
 
