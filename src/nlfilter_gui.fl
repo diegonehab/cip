@@ -209,12 +209,12 @@ widget_class ParamHueSaturationLightnessUI {open
 } 
 
 widget_class ParamUnsharpMaskUI {open
-  xywh {736 789 355 100} type Double hide
-  class Fl_Group
+  xywh {736 789 355 100} type Double
+  class Fl_Group visible
 } {
   Fl_Value_Slider radius {
-    label {radius:}
-    xywh {80 4 270 25} type {Horz Knob} align 4 maximum 500 value 1
+    label {radius:} selected
+    xywh {80 4 270 25} type {Horz Knob} align 4 maximum 10 value 1
   }
   Fl_Value_Slider amount {
     label {amount:}
@@ -222,7 +222,7 @@ widget_class ParamUnsharpMaskUI {open
   }
   Fl_Value_Slider threshold {
     label {threshold:}
-    xywh {80 72 270 25} type {Horz Knob} align 4 maximum 2
+    xywh {80 72 270 25} type {Horz Knob} align 4
   }
 } 
 
@@ -245,7 +245,7 @@ widget_class ParamEmbossUI {open
   class Fl_Group visible
 } {
   Fl_Value_Slider amount {
-    label {amount:} selected
+    label {amount:}
     xywh {80 4 270 25} type {Horz Knob} align 4 maximum 30 value 5
   }
   Fl_Value_Slider offset {
