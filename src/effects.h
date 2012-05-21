@@ -120,6 +120,7 @@ float luminance(float in)
 __device__ inline 
 float luminance(float3 in)
 {
+    in = srgb2lrgb(in);
     return  .299f * in.x + .587f * in.y + .114f * in.z;
 }
 
