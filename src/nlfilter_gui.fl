@@ -221,7 +221,21 @@ widget_class ParamUnsharpMaskUI {open
     xywh {80 37 270 25} type {Horz Knob} align 4 maximum 10
   }
   Fl_Value_Slider threshold {
-    label {threshold:} selected
+    label {threshold:}
     xywh {80 72 270 25} type {Horz Knob} align 4 maximum 2
+  }
+} 
+
+widget_class ParamBilateralUI {open
+  xywh {746 799 355 100} type Double
+  class Fl_Group visible
+} {
+  Fl_Value_Slider sigma_s {
+    label {sigma_s:}
+    xywh {80 4 270 25} type {Horz Knob} align 4 maximum 15 value 5
+  }
+  Fl_Value_Slider sigma_r {
+    label {sigma_r:} selected
+    xywh {80 37 270 25} type {Horz Knob} align 4 value 0.05
   }
 } 

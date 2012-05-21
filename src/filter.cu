@@ -36,6 +36,7 @@ const int
 #endif
 
 __constant__ float2 blue_noise[SAMPDIM];
+
 __constant__ float bspline3_data[SAMPDIM*KS*KS];
 
 texture<float, 2, cudaReadModeElementType> t_aux_float;
@@ -57,6 +58,8 @@ template <effect_type OP, class S>
 __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 {
     bspline3_sampler<texfetch_aux_float> sampler_aux_float;
+    
+    typedef typename S::result_type result_type;
 
     switch(OP)
     {
@@ -98,6 +101,42 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
     case EFFECT_UNSHARP_MASK:
         return unsharp_mask(sampler(pos),sampler_aux_float(pos),
                             filter_op.amount,filter_op.threshold);
+    case EFFECT_BILATERAL:
+        {
+            const float scale = 3*filter_op.sigma_s;
+            // we're using sigma_r*3 to compesate something I don't understand
+            const float inv_2sigma_r2 = 1.0f/(2*filter_op.sigma_r*filter_op.sigma_r),
+                        inv_2sigma_s2 = 1.0f/(2*filter_op.sigma_s*filter_op.sigma_s);
+
+            const result_type center = sampler(pos);
+            result_type sum_weight = pixel_traits<result_type>::make_pixel(0), 
+                        sum_color = pixel_traits<result_type>::make_pixel(0);
+
+            const float space = 1.0f/8;
+
+#pragma unroll
+            for(int i=0; i<8; ++i)
+            {
+#pragma unroll
+                for(int j=0; j<8; ++j)
+                {
+                    // d = [-0.5+1/16;0.5-1/16]
+                    float2 d = make_float2(j+0.5f, i+0.5f)*space - 0.5f;
+
+                    d *= scale;
+
+                    float weight_s = expf(-(d.x*d.x + d.y*d.y)*inv_2sigma_s2);
+
+                    result_type c = sampler(pos+d),
+                                dc = center-c,
+                                weight = expf(dc*dc*-inv_2sigma_r2)*weight_s;
+
+                    sum_color += c*weight;
+                    sum_weight += weight;
+                }
+            }
+            return sum_color / sum_weight;
+        }
     case EFFECT_IDENTITY:
     default:
         return sampler(pos);
@@ -175,6 +214,7 @@ void init_blue_noise()/*{{{*/
             }
         }
     }
+
     copy_to_symbol("blue_noise",blue_noise);
     copy_to_symbol("bspline3_data",bspline3_data);
 }/*}}}*/
@@ -476,6 +516,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     CASE(EFFECT_YAROSLAVSKY_BILATERAL);
     CASE(EFFECT_BRIGHTNESS_CONTRAST);
     CASE(EFFECT_HUE_SATURATION_LIGHTNESS);
+    CASE(EFFECT_BILATERAL);
     case EFFECT_UNSHARP_MASK:
         assert(plan->a_aux_float != NULL);
 

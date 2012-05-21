@@ -27,7 +27,8 @@ enum effect_type
     EFFECT_YAROSLAVSKY_BILATERAL,
     EFFECT_BRIGHTNESS_CONTRAST,
     EFFECT_HUE_SATURATION_LIGHTNESS,
-    EFFECT_UNSHARP_MASK
+    EFFECT_UNSHARP_MASK,
+    EFFECT_BILATERAL
 };
 
 enum filter_type
@@ -97,6 +98,12 @@ struct filter_operation
         {
             float dummy, // will use threshold above
                   sigma, amount;
+        };
+
+        // bilateral
+        struct
+        {
+            float sigma_s, sigma_r;
         };
     };
 };

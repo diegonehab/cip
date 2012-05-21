@@ -117,6 +117,7 @@ MainFrame::MainFrame()
     m_effects->add("Brightness and contrast",0,NULL,(void*)EFFECT_BRIGHTNESS_CONTRAST);
     m_effects->add("Hue, saturation and lightness",0,NULL,(void*)EFFECT_HUE_SATURATION_LIGHTNESS);
     m_effects->add("Unsharp mask",0,NULL,(void*)EFFECT_UNSHARP_MASK);
+    m_effects->add("Bilateral",0,NULL,(void*)EFFECT_BILATERAL);
     m_effects->value(0);
 
     m_pre_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
@@ -192,6 +193,11 @@ filter_operation MainFrame::get_filter_operation() const
         op.sigma = panel->radius->value();
         op.amount = panel->amount->value();
         op.threshold = panel->threshold->value();
+    }
+    else if(const ParamBilateralUI *panel = dynamic_cast<const ParamBilateralUI *>(m_param_panel))
+    {
+        op.sigma_r = panel->sigma_r->value();
+        op.sigma_s = panel->sigma_s->value();
     }
 
     return op;
@@ -520,6 +526,15 @@ void MainFrame::on_choose_effect(effect_type effect)
             restart_render_thread();
         }
         break;
+    case EFFECT_BILATERAL:
+        {
+            ParamBilateralUI *_panel 
+                = new ParamBilateralUI(0,0,pw,ph);
+            _panel->sigma_r->callback(on_param_changed, this);
+            _panel->sigma_s->callback(on_param_changed, this);
+            panel = _panel;
+        }
+        break;
     }
 
     if(m_param_panel)
@@ -653,6 +668,14 @@ filter_operation parse_filter_operation(const std::string &spec)
         if(c[0] != ',' || c[1] != ',')
             ss.setstate(std::ios::failbit);
     }
+    else if(opname == "bilateral")
+    {
+        op.type = EFFECT_BILATERAL;
+        char c;
+        ss >> op.sigma_s >> c >> op.sigma_r;
+        if(c != ',')
+            ss.setstate(std::ios::failbit);
+    }
     else 
         throw std::runtime_error("Bad effect type");
 
@@ -690,6 +713,8 @@ void print_help(const char *progname)
             "  - brightness_contrast[brightness,contrast]\n"
             "  - hue_saturation_lightness[hue,saturation,lightness]\n"
             "  - unsharp_mask[sigma,amount,threshold]\n"
+            "  - unsharp mask[sigma,amount,threshold]\n"
+            "  - bilateral[sigma,amount,threshold]\n"
             "\n"
             " pre_filter and post_filter are:\n"
             "  - bspline3\n"
