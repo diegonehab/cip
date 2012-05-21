@@ -122,7 +122,7 @@ float luminance(float in)
 __device__ inline 
 float luminance(float3 in)
 {
-    in = srgb2lrgb(in);
+    // 'in' must be in linear space
     return  .299f * in.x + .587f * in.y + .114f * in.z;
 }
 
@@ -437,13 +437,14 @@ float hue_saturation_lightness(float v, float hue, float saturation,
 __device__ inline
 float3 unsharp_mask(float3 v, float blurred_vy, float amount, float threshold)
 {
-    float3 v_yiq = rgb2yiq(srgb2lrgb(v));
+    // v must be in linear space
+    float3 v_yiq = rgb2yiq(v);
 
     float dy = v_yiq.x - blurred_vy;
 
     v_yiq.x += v_yiq.x*amount*(dy < threshold ? dy*dy : dy);
 
-    return lrgb2srgb(yiq2rgb(v_yiq));
+    return yiq2rgb(v_yiq);
 }
 
 __device__ inline
