@@ -114,10 +114,8 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
 
             const float space = 1.0f/8;
 
-#pragma unroll
             for(int i=0; i<8; ++i)
             {
-#pragma unroll
                 for(int j=0; j<8; ++j)
                 {
                     // d = [-0.5+1/16;0.5-1/16]
