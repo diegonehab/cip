@@ -118,6 +118,7 @@ MainFrame::MainFrame()
     m_effects->add("Hue, saturation and lightness",0,NULL,(void*)EFFECT_HUE_SATURATION_LIGHTNESS);
     m_effects->add("Unsharp mask",0,NULL,(void*)EFFECT_UNSHARP_MASK);
     m_effects->add("Bilateral",0,NULL,(void*)EFFECT_BILATERAL);
+    m_effects->add("Emboss",0,NULL,(void*)EFFECT_EMBOSS);
     m_effects->value(0);
 
     m_pre_filter->add("Cubic BSpline",0,NULL,(void*)FILTER_BSPLINE3);
@@ -199,6 +200,11 @@ filter_operation MainFrame::get_filter_operation() const
     {
         op.sigma_r = panel->sigma_r->value();
         op.sigma_s = panel->sigma_s->value();
+    }
+    else if(const ParamEmbossUI *panel = dynamic_cast<const ParamEmbossUI *>(m_param_panel))
+    {
+        op.amount = panel->amount->value();
+        op.offset = panel->offset->value();
     }
 
     return op;
@@ -536,6 +542,15 @@ void MainFrame::on_choose_effect(effect_type effect)
             panel = _panel;
         }
         break;
+    case EFFECT_EMBOSS:
+        {
+            ParamEmbossUI *_panel 
+                = new ParamEmbossUI(0,0,pw,ph);
+            _panel->amount->callback(on_param_changed, this);
+            _panel->offset->callback(on_param_changed, this);
+            panel = _panel;
+        }
+        break;
     }
 
     if(m_param_panel)
@@ -677,6 +692,14 @@ filter_operation parse_filter_operation(const std::string &spec)
         if(c != ',')
             ss.setstate(std::ios::failbit);
     }
+    else if(opname == "emboss")
+    {
+        op.type = EFFECT_EMBOSS;
+        char c;
+        ss >> op.amount >> c >> op.offset;
+        if(c != ',')
+            ss.setstate(std::ios::failbit);
+    }
     else 
         throw std::runtime_error("Bad effect type");
 
@@ -718,6 +741,7 @@ void print_help(const char *progname)
             "  - unsharp_mask[sigma,amount,threshold]\n"
             "  - unsharp mask[sigma,amount,threshold]\n"
             "  - bilateral[sigma,amount,threshold]\n"
+            "  - emboss[amount,offset]\n"
             "\n"
             " pre_filter and post_filter are:\n"
             "  - bspline3\n"

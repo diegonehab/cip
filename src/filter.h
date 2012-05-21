@@ -28,7 +28,8 @@ enum effect_type
     EFFECT_BRIGHTNESS_CONTRAST,
     EFFECT_HUE_SATURATION_LIGHTNESS,
     EFFECT_UNSHARP_MASK,
-    EFFECT_BILATERAL
+    EFFECT_BILATERAL,
+    EFFECT_EMBOSS
 };
 
 enum filter_type
@@ -98,13 +99,20 @@ struct filter_operation
         struct
         {
             float dummy, // will use threshold above
-                  sigma, amount;
+                  amount, sigma;
         };
 
         // bilateral
         struct
         {
             float sigma_s, sigma_r;
+        };
+
+        // emboss
+        struct
+        {
+            float offset,  
+                  dummy2; // will use amount above
         };
     };
 };

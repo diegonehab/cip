@@ -99,6 +99,13 @@ __device__ typename S::result_type do_filter(const S &sampler, float2 pos)
     case EFFECT_UNSHARP_MASK:
         return unsharp_mask(sampler(pos),sampler_aux_float(pos),
                             filter_op.amount,filter_op.threshold);
+    case EFFECT_EMBOSS:
+        {
+            result_type i0 = sampler(pos),
+                        i1 = sampler(pos+make_float2(-filter_op.offset,
+                                                     filter_op.offset));
+            return saturate(filter_op.amount*(i0-i1)+.5f);
+        }
     case EFFECT_BILATERAL:
         {
             const float scale = 3*filter_op.sigma_s;
@@ -524,6 +531,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     CASE(EFFECT_BRIGHTNESS_CONTRAST);
     CASE(EFFECT_HUE_SATURATION_LIGHTNESS);
     CASE(EFFECT_BILATERAL);
+    CASE(EFFECT_EMBOSS);
     case EFFECT_UNSHARP_MASK:
         assert(plan->a_aux_float != NULL);
 
