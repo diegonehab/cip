@@ -30,8 +30,6 @@ public:
     void on_window_point_sampling(bool enable);
 
     void on_choose_effect(effect_type effect);
-    void on_apply_effect();
-    void on_undo_effect();
     void on_change_grayscale(bool gs);
     void on_change_point_sampling(bool gs);
 
@@ -730,14 +728,6 @@ void MainFrame::on_choose_effect(effect_type effect)/*{{{*/
     update_image();
 }/*}}}*/
 
-void MainFrame::on_apply_effect()
-{
-}
-
-void MainFrame::on_undo_effect()
-{
-}
-
 void MainFrame::update_image()/*{{{*/
 {
     // signal the rende thread that it has a new render job to do
@@ -1161,22 +1151,6 @@ void on_choose_effect(Fl_Choice *m, void*)/*{{{*/
     try
     {
         get_frame(m)->on_choose_effect((effect_type)(ptrdiff_t)m->mvalue()->user_data_);
-    }
-    CATCH()
-}/*}}}*/
-void on_apply_effect(Fl_Return_Button *m, void*)/*{{{*/
-{
-    try
-    {
-        get_frame(m)->on_apply_effect();
-    }
-    CATCH()
-}/*}}}*/
-void on_undo_effect(Fl_Button *m, void*)/*{{{*/
-{
-    try
-    {
-        get_frame(m)->on_undo_effect();
     }
     CATCH()
 }/*}}}*/
