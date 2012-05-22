@@ -15,7 +15,7 @@
 #   include "cuPrintf.cuh"
 #endif
 
-class MainFrame : public MainFrameUI
+class MainFrame : public MainFrameUI/*{{{*/
 {
 public:
     MainFrame();
@@ -109,9 +109,9 @@ private:
 
     int m_last_imgframe_box_pos_x,
         m_last_imgframe_box_pos_y;
-};
+};/*}}}*/
 
-MainFrame::MainFrame()
+MainFrame::MainFrame()/*{{{*/
     : MainFrameUI(753,319,720,155, "NLFilter")
     , m_render_thread((void(*)(void*))&MainFrame::render_thread, this, false)
     , m_param_panel(NULL)
@@ -154,14 +154,13 @@ MainFrame::MainFrame()
     m_post_filter->add("Box",0,NULL,(void*)FILTER_BOX);
     m_post_filter->value(1);
     m_post_filter->callback((Fl_Callback *)&MainFrame::on_filter_changed, this);
-}
-
-MainFrame::~MainFrame()
+}/*}}}*/
+MainFrame::~MainFrame()/*{{{*/
 {
     stop_render_thread();
-}
+}/*}}}*/
 
-filter_operation MainFrame::get_filter_operation() const
+filter_operation MainFrame::get_filter_operation() const/*{{{*/
 {
     filter_operation op;
 
@@ -235,18 +234,17 @@ filter_operation MainFrame::get_filter_operation() const
     }
 
     return op;
-}
+}/*}}}*/
 
-void MainFrame::start_render_thread()
+void MainFrame::start_render_thread()/*{{{*/
 {
     if(!m_render_thread.is_started())
     {
         m_terminate_thread = false;
         m_render_thread.start();
     }
-}
-
-void MainFrame::stop_render_thread()
+}/*}}}*/
+void MainFrame::stop_render_thread()/*{{{*/
 {
     // signal the render thread to terminate
     rod::unique_lock lk(m_mtx_render_data);
@@ -256,21 +254,21 @@ void MainFrame::stop_render_thread()
 
     // just wait until it finishes
     m_render_thread.join();
-}
+}/*}}}*/
 
 // defined on timer.cpp
 std::string unit_value(double v, double base);
 
-void show_error(std::string *data)
+void show_error(std::string *data)/*{{{*/
 {
     if(data != NULL)
     {
         fl_alert(data->c_str());
         delete data;
     }
-}
+}/*}}}*/
 
-void *MainFrame::render_thread(MainFrame *frame)
+void *MainFrame::render_thread(MainFrame *frame)/*{{{*/
 {
     filter_plan *plan = NULL, *plan_box = NULL;
 
@@ -437,9 +435,9 @@ void *MainFrame::render_thread(MainFrame *frame)
 
     free(plan);
     free(plan_box);
-}
+}/*}}}*/
 
-void MainFrame::on_change_grayscale(bool gs)
+void MainFrame::on_change_grayscale(bool gs)/*{{{*/
 {
     if(m_image_frame)
         m_image_frame->set_grayscale(gs);
@@ -451,9 +449,9 @@ void MainFrame::on_change_grayscale(bool gs)
     restart_render_thread();
 
     update_image();
-}
+}/*}}}*/
 
-void MainFrame::on_change_point_sampling(bool ps)
+void MainFrame::on_change_point_sampling(bool ps)/*{{{*/
 { 
     m_use_point_sampling = ps;
 
@@ -464,16 +462,16 @@ void MainFrame::on_change_point_sampling(bool ps)
 
     restart_render_thread();
     update_image();
-}
+}/*}}}*/
 
-void MainFrame::on_filter_changed(Fl_Widget *,MainFrame *frame)
+void MainFrame::on_filter_changed(Fl_Widget *,MainFrame *frame)/*{{{*/
 {
     // must reprocess input image with new pre- and post-filter
     frame->restart_render_thread();
     frame->update_image();
-}
+}/*}}}*/
 
-void MainFrame::open(const std::string &fname)
+void MainFrame::open(const std::string &fname)/*{{{*/
 {
     std::vector<uchar4> imgdata;
     int width, height;
@@ -496,9 +494,9 @@ void MainFrame::open(const std::string &fname)
     restart_render_thread();
 
     m_file_name = fname;
-}
+}/*}}}*/
 
-void MainFrame::on_file_open()
+void MainFrame::on_file_open()/*{{{*/
 {
     Fl_File_Chooser dlg(".","Images (*.{jpg,png,ppm,pgm,pnm,pbm})\t"
                             "All (*)", Fl_File_Chooser::SINGLE,
@@ -513,22 +511,20 @@ void MainFrame::on_file_open()
         return;
 
     open(dlg.value(1));
-}
+}/*}}}*/
 
-void MainFrame::on_file_save()
+void MainFrame::on_file_save()/*{{{*/
 {
-}
-
-void MainFrame::on_file_save_as()
+}/*}}}*/
+void MainFrame::on_file_save_as()/*{{{*/
 {
-}
-
-void MainFrame::on_file_exit()
+}/*}}}*/
+void MainFrame::on_file_exit()/*{{{*/
 {
     hide();
-}
+}/*}}}*/
 
-void MainFrame::on_window_point_sampling(bool enable)
+void MainFrame::on_window_point_sampling(bool enable)/*{{{*/
 {
     // fltk is nuts, we can't trust on m->check() being
     // correct during user selection. so let's just toggle
@@ -571,9 +567,9 @@ void MainFrame::on_window_point_sampling(bool enable)
     lk.unlock();
 
     restart_render_thread();
-}
+}/*}}}*/
 
-void MainFrame::on_choose_effect(effect_type effect)
+void MainFrame::on_choose_effect(effect_type effect)/*{{{*/
 {
     Fl_Group *panel = NULL;
 
@@ -732,7 +728,7 @@ void MainFrame::on_choose_effect(effect_type effect)
 
     // update the image with the new effect
     update_image();
-}
+}/*}}}*/
 
 void MainFrame::on_apply_effect()
 {
@@ -742,7 +738,7 @@ void MainFrame::on_undo_effect()
 {
 }
 
-void MainFrame::update_image()
+void MainFrame::update_image()/*{{{*/
 {
     // signal the rende thread that it has a new render job to do
     rod::unique_lock lk(m_mtx_render_data);
@@ -750,9 +746,9 @@ void MainFrame::update_image()
     m_has_new_render_job = true;
 
     m_wakeup.signal();
-}
+}/*}}}*/
 
-filter_operation parse_filter_operation(const std::string &spec)
+filter_operation parse_filter_operation(const std::string &spec)/*{{{*/
 {
     std::istringstream ss(spec);
 
@@ -875,9 +871,9 @@ filter_operation parse_filter_operation(const std::string &spec)
         throw std::runtime_error("Syntax error on effect specification");
 
     return op;
-}
+}/*}}}*/
 
-filter_type parse_filter_type(const std::string &name)
+filter_type parse_filter_type(const std::string &name)/*{{{*/
 {
     if(name == "bspline3")
         return FILTER_BSPLINE3;
@@ -889,9 +885,9 @@ filter_type parse_filter_type(const std::string &name)
         return FILTER_BOX;
     else
         throw std::runtime_error("Bad filter type");
-}
+}/*}}}*/
 
-void print_help(const char *progname)
+void print_help(const char *progname)/*{{{*/
 {
     std::cout << "Usage: " << progname << " [--post post_filter] [--pre pre_filter] [-e/--effect effect_descr] [-o/--output output_file] [-h/--help] [input_file]\n"
             " where effect_descr is one of:\n"
@@ -920,9 +916,9 @@ void print_help(const char *progname)
             "  - box\n"
             "\n"
             "without -o, shows a GUI\n";
-}
+}/*}}}*/
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[])/*{{{*/
 {
     try
     {
@@ -1093,7 +1089,7 @@ int main(int argc, char *argv[])
         std::cerr << e.what() << std::endl;
         return 1;
     }
-}
+}/*}}}*/
 
 /*{{{ Proxy event handlers */
 #define CATCH() \
