@@ -62,7 +62,7 @@ widget_class MainFrameUI {open
   }
   Fl_Light_Button m_grayscale {
     label Grayscale
-    callback on_change_grayscale selected
+    callback on_change_grayscale
     xywh {254 120 90 25}
   }
   Fl_Choice m_effects {
@@ -74,6 +74,11 @@ widget_class MainFrameUI {open
     label {Pre-filter} open
     xywh {73 90 272 25} down_box BORDER_BOX
   } {}
+  Fl_Light_Button {} {
+    label {Point Sampling}
+    callback on_change_point_sampling selected
+    xywh {116 120 125 25}
+  }
 } 
 
 widget_class ParamPosterizeUI {open

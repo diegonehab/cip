@@ -33,6 +33,7 @@ public:
     void on_apply_effect();
     void on_undo_effect();
     void on_change_grayscale(bool gs);
+    void on_change_point_sampling(bool gs);
 
     static void on_filter_changed(Fl_Widget *,MainFrame *frame);
 
@@ -77,6 +78,7 @@ public:
 
 private:
     std::string m_file_name;
+    bool m_use_point_sampling;
 
     void restart_render_thread()
     {
@@ -119,6 +121,7 @@ MainFrame::MainFrame()
     , m_has_new_render_job(false)
     , m_last_imgframe_box_pos_x(-666) // our "not set" value \m/
     , m_last_imgframe_box_pos_y(-666)
+    , m_use_point_sampling(false)
 {
     m_effects->add("Identity",0,NULL,(void*)EFFECT_IDENTITY);
     m_effects->add("Posterize",0,NULL,(void*)EFFECT_POSTERIZE);
@@ -283,6 +286,12 @@ void *MainFrame::render_thread(MainFrame *frame)
         op_box.use_supersampling = false;
         op_box.pre_filter = op_box.post_filter = FILTER_BOX;
 
+        if(frame->m_use_point_sampling)
+        {
+            op.use_supersampling = false;
+            op.pre_filter = op_box.post_filter = FILTER_BOX;
+        }
+
         bool grayscale = frame->m_grayscale->value();
 
         if(grayscale)
@@ -328,6 +337,12 @@ void *MainFrame::render_thread(MainFrame *frame)
                     ImageFrame::OutputBufferLocker lkbuffers(*imgframe);
 
                     filter_operation op = frame->get_filter_operation();
+
+                    if(frame->m_use_point_sampling)
+                    {
+                        op.use_supersampling = false;
+                        op.pre_filter = op_box.post_filter = FILTER_BOX;
+                    }
 
                     gpu_timer timer;
 
@@ -441,6 +456,13 @@ void MainFrame::on_change_grayscale(bool gs)
     // must preprocess input image again
     restart_render_thread();
 
+    update_image();
+}
+
+void MainFrame::on_change_point_sampling(bool ps)
+{ 
+    m_use_point_sampling = ps;
+    restart_render_thread();
     update_image();
 }
 
@@ -1165,6 +1187,14 @@ void on_change_grayscale(Fl_Light_Button*lb, void*)/*{{{*/
     try
     {
         get_frame(lb)->on_change_grayscale(lb->value());
+    }
+    CATCH()
+}/*}}}*/
+void on_change_point_sampling(Fl_Light_Button*lb, void*)/*{{{*/
+{
+    try
+    {
+        get_frame(lb)->on_change_point_sampling(lb->value());
     }
     CATCH()
 }/*}}}*/
