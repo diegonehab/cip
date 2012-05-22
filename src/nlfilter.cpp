@@ -498,6 +498,12 @@ void MainFrame::on_change_grayscale(bool gs)/*{{{*/
     if(m_image_frame_box)
         m_image_frame_box->set_grayscale(gs);
 
+    if(m_zoom_frame)
+        m_zoom_frame->set_grayscale(gs);
+
+    if(m_zoom_frame_box)
+        m_zoom_frame_box->set_grayscale(gs);
+
     // must preprocess input image again
     if(!m_show_original_image)
         restart_render_thread();
