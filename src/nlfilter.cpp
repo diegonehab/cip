@@ -462,6 +462,12 @@ void MainFrame::on_change_grayscale(bool gs)
 void MainFrame::on_change_point_sampling(bool ps)
 { 
     m_use_point_sampling = ps;
+
+    if(m_use_point_sampling)
+        m_image_frame->copy_label(("Point Sampling: "+m_file_name).c_str());
+    else
+        m_image_frame->copy_label(("Supersampling: "+m_file_name).c_str());
+
     restart_render_thread();
     update_image();
 }
