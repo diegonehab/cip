@@ -504,11 +504,20 @@ void subimage(dimage<T,C> &dst, dimage_ptr<T,C> src, int x, int y, int w, int h)
 {
     typedef typename dimage<T,C>::texel_type texel_type;
 
+    if(x >= src.width() || x < 0)
+        throw std::invalid_argument("Bad x position");
+
+    if(y >= src.height() || y < 0)
+        throw std::invalid_argument("Bad x position");
+
+    w = min(w, src.width()-x);
+    h = min(w, src.height()-h);
+
     dst.resize(w,h);
     for(int i=0; i<C; ++i)
     {
-        cudaMemcpy2D(&dst+i*dst.channelstride(), dst.rowstride()*sizeof(texel_type), 
-                     &src+i*src.channelstride()+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
+        cudaMemcpy2D(&dst[i], dst.rowstride()*sizeof(texel_type), 
+                     &src[i]+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
                      w*sizeof(texel_type), h, cudaMemcpyHostToDevice);
     }
 
@@ -523,10 +532,19 @@ void subimage(dimage_ptr<T,C> dst, dimage_ptr<T,C> src, int x, int y, int w, int
     if(dst.width() != w || dst.height()!=h)
         throw std::invalid_argument("Bad destination image dimensions");
 
+    if(x >= src.width() || x < 0)
+        throw std::invalid_argument("Bad x position");
+
+    if(y >= src.height() || y < 0)
+        throw std::invalid_argument("Bad x position");
+
+    w = min(w, src.width()-x);
+    h = min(w, src.height()-h);
+
     for(int i=0; i<C; ++i)
     {
-        cudaMemcpy2D(&dst+i*dst.channelstride(), dst.rowstride()*sizeof(texel_type), 
-                     &src+i*src.channelstride()+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
+        cudaMemcpy2D(dst[i], dst.rowstride()*sizeof(texel_type), 
+                     &src[i]+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
                      w*sizeof(texel_type), h, cudaMemcpyHostToDevice);
     }
 
