@@ -354,9 +354,6 @@ void *MainFrame::render_thread(MainFrame *frame)
 
                     timer.stop();
                     elapsed = timer.elapsed();
-
-                    // done working with buffers, release the lock
-                    lkbuffers.unlock();
                 }
 
                 lkiframebox.lock();
@@ -382,9 +379,6 @@ void *MainFrame::render_thread(MainFrame *frame)
                         filter(plan_box, imgframe_box->get_output(), op);
 
   //                  timer.stop();
-
-                    // done working with buffers, release the lock
-                    lkbuffers.unlock();
                 }
                 lkiframebox.unlock();
 
@@ -573,6 +567,8 @@ void MainFrame::on_window_point_sampling(bool enable)
         m_image_frame_box->set_input_image(dimage_ptr<const float,3>(m_image_frame->get_input()));
         m_image_frame_box->copy_label(("Point Sampling: "+m_file_name).c_str());
     }
+
+    lk.unlock();
 
     restart_render_thread();
 }
