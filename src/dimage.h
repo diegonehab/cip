@@ -61,6 +61,11 @@ public:
         reset(NULL,0,0,0);
     }
 
+    friend void set_zero(dimage &img)
+    {
+        img.m_data.fillzero();
+    }
+
     void copy_to_host(mutable_texel_type *out) const
     {
         for(int i=0; i<C; ++i)
