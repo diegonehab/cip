@@ -317,6 +317,16 @@ void ImageFrame::swap_buffers()
     refresh();
 }
 
+void ImageFrame::reset()
+{
+    if(pimpl->grayscale)
+        pimpl->img_backbuffer[0] = pimpl->img_input_grayscale;
+    else
+        pimpl->img_backbuffer = pimpl->img_input;
+
+    swap_buffers();
+}
+
 void ImageFrame::draw()
 {
     try

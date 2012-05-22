@@ -29,6 +29,8 @@ public:
 
     void set_grayscale(bool en);
 
+    void reset();
+
     dimage_ptr<const float,3> get_input() const;
     dimage_ptr<float,3> get_output();
 
