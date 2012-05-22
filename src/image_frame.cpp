@@ -194,6 +194,31 @@ ImageFrame::~ImageFrame()
     delete pimpl;
 }
 
+void ImageFrame::set_blank_input_image(int w, int h)
+{
+    if(w <= 0 || h  <= 0)
+        throw std::runtime_error("Invalid image dimensions");
+
+    make_current();
+
+    if(!pimpl->gl_ok)
+        pimpl->initgl();
+
+    pimpl->img_input.resize(w,h);
+    set_zero(pimpl->img_input);
+
+    pimpl->img_input_grayscale.resize(w, h);
+    set_zero(pimpl->img_input_grayscale);
+
+    // to create textures and setup output buffers
+    set_grayscale(pimpl->grayscale);
+
+    pimpl->img_buffer.resize(w,h);
+    pimpl->img_backbuffer.resize(w,h);
+
+    resize(x(),y(),w,h);
+}
+
 void ImageFrame::set_input_image(dimage_ptr<const float3> img)
 {
     if(img.width() <= 0 || img.height()  <= 0)

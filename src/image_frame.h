@@ -27,6 +27,8 @@ public:
     void set_input_image(dimage_ptr<const float3> img);
     void set_input_image(dimage_ptr<const float,3> img);
 
+    void set_blank_input_image(int w, int h);
+
     void set_grayscale(bool en);
 
     void reset();
