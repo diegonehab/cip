@@ -3,8 +3,8 @@ version 1.0300
 header_name {.h} 
 code_name {.cxx}
 widget_class MainFrameUI {open
-  xywh {930 418 720 155} type Double
-  class Fl_Double_Window visible
+  xywh {930 418 720 155} type Double hide
+  class Fl_Double_Window
 } {
   Fl_Menu_Bar {} {open
     xywh {0 0 720 25}
@@ -45,26 +45,18 @@ widget_class MainFrameUI {open
       }
     }
   }
-  Fl_Choice m_post_filter {
-    label {Post-filter} open
-    xywh {73 30 272 25} down_box BORDER_BOX
-  } {}
-  Fl_Group m_param_group {open
-    xywh {350 31 366 120} align 5
-  } {}
-  Fl_Value_Output m_status_fps {
-    label FPS
-    xywh {612 0 75 25} align 8
-  }
   Fl_Value_Output m_status_rate {
     label {GP/s}
     xywh {467 0 90 25} align 8
   }
-  Fl_Light_Button m_grayscale {
-    label Grayscale
-    callback on_change_grayscale
-    xywh {254 120 90 25}
+  Fl_Value_Output m_status_fps {
+    label FPS
+    xywh {612 0 75 25} align 8
   }
+  Fl_Choice m_post_filter {
+    label {Post-filter} open
+    xywh {73 30 272 25} down_box BORDER_BOX
+  } {}
   Fl_Choice m_effects {
     label {Effect:}
     callback on_choose_effect open
@@ -74,11 +66,24 @@ widget_class MainFrameUI {open
     label {Pre-filter} open
     xywh {73 90 272 25} down_box BORDER_BOX
   } {}
-  Fl_Light_Button {} {
+  Fl_Light_Button m_original {
+    label Original
+    callback on_change_original
+    xywh {10 120 100 25}
+  }
+  Fl_Light_Button m_point_sampling {
     label {Point Sampling}
     callback on_change_point_sampling selected
-    xywh {116 120 125 25}
+    xywh {120 120 125 25}
   }
+  Fl_Light_Button m_grayscale {
+    label Grayscale
+    callback on_change_grayscale
+    xywh {254 120 90 25}
+  }
+  Fl_Group m_param_group {open
+    xywh {350 31 366 120} align 5
+  } {}
 } 
 
 widget_class ParamPosterizeUI {open

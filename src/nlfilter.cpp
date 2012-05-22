@@ -32,6 +32,7 @@ public:
     void on_choose_effect(effect_type effect);
     void on_change_grayscale(bool gs);
     void on_change_point_sampling(bool gs);
+    void on_change_original(bool en);
 
     static void on_filter_changed(Fl_Widget *,MainFrame *frame);
 
@@ -98,6 +99,7 @@ private:
     rod::mutex m_mtx_render_data;
     bool m_terminate_thread; // tells the render thread to finish its business
     bool m_has_new_render_job;
+    bool m_show_original_image;
 
     Fl_Group *m_param_panel; // current effect parameter panel
     ImageFrame *m_image_frame; 
@@ -120,6 +122,7 @@ MainFrame::MainFrame()/*{{{*/
     , m_last_imgframe_box_pos_x(-666) // our "not set" value \m/
     , m_last_imgframe_box_pos_y(-666)
     , m_use_point_sampling(false)
+    , m_show_original_image(false)
 {
     m_effects->add("Identity",0,NULL,(void*)EFFECT_IDENTITY);
     m_effects->add("Posterize",0,NULL,(void*)EFFECT_POSTERIZE);
@@ -437,6 +440,7 @@ void *MainFrame::render_thread(MainFrame *frame)/*{{{*/
 
 void MainFrame::on_change_grayscale(bool gs)/*{{{*/
 {
+
     if(m_image_frame)
         m_image_frame->set_grayscale(gs);
 
@@ -444,11 +448,10 @@ void MainFrame::on_change_grayscale(bool gs)/*{{{*/
         m_image_frame_box->set_grayscale(gs);
 
     // must preprocess input image again
-    restart_render_thread();
-
+    if(!m_show_original_image)
+        restart_render_thread();
     update_image();
 }/*}}}*/
-
 void MainFrame::on_change_point_sampling(bool ps)/*{{{*/
 { 
     m_use_point_sampling = ps;
@@ -458,8 +461,29 @@ void MainFrame::on_change_point_sampling(bool ps)/*{{{*/
     else
         m_image_frame->copy_label(("Supersampling: "+m_file_name).c_str());
 
-    restart_render_thread();
+    if(!m_show_original_image)
+        restart_render_thread();
     update_image();
+}/*}}}*/
+void MainFrame::on_change_original(bool gs)/*{{{*/
+{
+    m_show_original_image = gs;
+
+    if(m_show_original_image)
+    {
+        stop_render_thread();
+        m_image_frame->reset();
+        if(m_image_frame_box)
+            m_image_frame_box->reset();
+
+        m_status_rate->value(0);
+        m_status_fps->value(0);
+    }
+    else
+    {
+        start_render_thread();
+        update_image();
+    }
 }/*}}}*/
 
 void MainFrame::on_filter_changed(Fl_Widget *,MainFrame *frame)/*{{{*/
@@ -1167,6 +1191,14 @@ void on_change_point_sampling(Fl_Light_Button*lb, void*)/*{{{*/
     try
     {
         get_frame(lb)->on_change_point_sampling(lb->value());
+    }
+    CATCH()
+}/*}}}*/
+void on_change_original(Fl_Light_Button*lb, void*)/*{{{*/
+{
+    try
+    {
+        get_frame(lb)->on_change_original(lb->value());
     }
     CATCH()
 }/*}}}*/
