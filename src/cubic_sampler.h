@@ -3,7 +3,7 @@
 
 #include "math_util.h"
 
-#define USE_FAST_CUBIC_INTERPOLATION 1
+#define USE_FAST_CUBIC_INTERPOLATION 0
 
 template <class F, class S>
 class cubic_sampler

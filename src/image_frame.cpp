@@ -153,6 +153,8 @@ ImageFrame::ImageFrame(int x, int y)
         // disables window closing
         callback(null_cb);
 
+        resizable(this);
+
         show();
         make_current();
 
@@ -164,7 +166,6 @@ ImageFrame::ImageFrame(int x, int y)
             check_cuda_error("Init CUDA-OpenGL interoperability");
             device_init = true;
         }
-
 //        enable_vsync();
     }
     catch(...)
@@ -216,9 +217,6 @@ void ImageFrame::set_input_image(dimage_ptr<const float3> img)
     pimpl->img_backbuffer.resize(img.width(),img.height());
 
     resize(x(),y(),img.width(),img.height());
-
-    glViewport(0,0,img.width(),img.height());
-    check_glerror();
 }
 
 void ImageFrame::set_input_image(dimage_ptr<const float,3> img)
@@ -326,6 +324,15 @@ void ImageFrame::reset()
 
     swap_buffers();
 }
+
+void ImageFrame::resize (int x, int y, int w, int h)
+{
+    Fl_Gl_Window::resize(x,y,w,h);
+
+    glViewport(0,0,w,h);
+    check_glerror();
+}
+
 
 void ImageFrame::draw()
 {
