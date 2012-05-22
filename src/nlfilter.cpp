@@ -42,6 +42,8 @@ public:
         frame->update_image();
     }
 
+    void show_zoom_frame(int ww, int wh, int x,int y,int w,int h);
+
     static void on_color_change(Fl_Widget *w, MainFrame *frame)
     {
         Fl_Button *btn = dynamic_cast<Fl_Button *>(w);
@@ -107,6 +109,9 @@ private:
     rod::mutex m_mtx_imgframe_box;
     ImageFrame *m_image_frame_box; 
 
+    ImageFrame *m_zoom_frame, *m_zoom_frame_box;
+    int m_zoom_x, m_zoom_y, m_zoom_w, m_zoom_h;
+
     int m_last_imgframe_box_pos_x,
         m_last_imgframe_box_pos_y;
 };/*}}}*/
@@ -123,7 +128,11 @@ MainFrame::MainFrame()/*{{{*/
     , m_last_imgframe_box_pos_y(-666)
     , m_use_point_sampling(false)
     , m_show_original_image(false)
+    , m_zoom_frame(NULL)
+    , m_zoom_frame_box(NULL)
 {
+    m_zoom_x = m_zoom_y = m_zoom_w = m_zoom_h = 0;
+
     m_effects->add("Identity",0,NULL,(void*)EFFECT_IDENTITY);
     m_effects->add("Posterize",0,NULL,(void*)EFFECT_POSTERIZE);
     m_effects->add("Scale",0,NULL,(void*)EFFECT_SCALE);
@@ -353,6 +362,24 @@ void *MainFrame::render_thread(MainFrame *frame)/*{{{*/
 
                     timer.stop();
                     elapsed = timer.elapsed();
+
+                    if(frame->m_zoom_frame)
+                    {
+                        if(grayscale)
+                        {
+                            subimage(frame->m_zoom_frame->get_grayscale_output(), 
+                                     imgframe->get_grayscale_output(),
+                                     frame->m_zoom_x,frame->m_zoom_y,
+                                     frame->m_zoom_w, frame->m_zoom_h);
+                        }
+                        else
+                        {
+                            subimage(frame->m_zoom_frame->get_output(), 
+                                     imgframe->get_output(),
+                                     frame->m_zoom_x, frame->m_zoom_y,
+                                     frame->m_zoom_w, frame->m_zoom_h);
+                        }
+                    }
                 }
 
                 lkiframebox.lock();
@@ -376,6 +403,24 @@ void *MainFrame::render_thread(MainFrame *frame)/*{{{*/
                         filter(plan_box, imgframe_box->get_grayscale_output(), op);
                     else
                         filter(plan_box, imgframe_box->get_output(), op);
+
+                    if(frame->m_zoom_frame_box)
+                    {
+                        if(grayscale)
+                        {
+                            subimage(frame->m_zoom_frame_box->get_grayscale_output(), 
+                                     imgframe_box->get_grayscale_output(),
+                                     frame->m_zoom_x,frame->m_zoom_y,
+                                     frame->m_zoom_w, frame->m_zoom_h);
+                        }
+                        else
+                        {
+                            subimage(frame->m_zoom_frame_box->get_output(), 
+                                     imgframe_box->get_output(),
+                                     frame->m_zoom_x, frame->m_zoom_y,
+                                     frame->m_zoom_w, frame->m_zoom_h);
+                        }
+                    }
 
   //                  timer.stop();
                 }
@@ -414,6 +459,12 @@ void *MainFrame::render_thread(MainFrame *frame)/*{{{*/
 
                 if(imgframe_box)
                     imgframe_box->swap_buffers();
+
+                if(frame->m_zoom_frame_box)
+                    frame->m_zoom_frame_box->swap_buffers();
+
+                if(frame->m_zoom_frame)
+                    frame->m_zoom_frame->swap_buffers();
 
                 lkiframebox.unlock();
 
@@ -516,6 +567,24 @@ void MainFrame::open(const std::string &fname)/*{{{*/
     restart_render_thread();
 
     m_file_name = fname;
+}/*}}}*/
+
+void MainFrame::show_zoom_frame(int ww, int wh, int x,int y,int w,int h)/*{{{*/
+{
+    m_zoom_x = x;
+    m_zoom_y = y;
+    m_zoom_w = w;
+    m_zoom_h = h;
+
+    m_zoom_frame = new ImageFrame(0,0,ww,wh);
+    m_zoom_frame->copy_label("Supersample Zoom");
+    m_zoom_frame->show();
+    m_zoom_frame->set_blank_input_image(w,h);
+
+    m_zoom_frame_box = new ImageFrame(ww+5,0,ww,wh);
+    m_zoom_frame_box->copy_label("Point Sampling Zoom");
+    m_zoom_frame_box->show();
+    m_zoom_frame_box->set_blank_input_image(w,h);
 }/*}}}*/
 
 void MainFrame::on_file_open()/*{{{*/
@@ -942,6 +1011,7 @@ int main(int argc, char *argv[])/*{{{*/
         std::string infile,
                     outfile,
                     effect = "identity[]";
+        std::string zoom_geom;
         bool do_grayscale = false;
         int flags = 0;
         filter_type prefilter = FILTER_CARDINAL_BSPLINE3,
@@ -955,11 +1025,12 @@ int main(int argc, char *argv[])/*{{{*/
             {"effect",required_argument,0,'e'},
             {"output",required_argument,0,'o'},
             {"verbose",no_argument,0,'v'},
+            {"zoom",required_argument,0,'z'},
             {0,0,0,0}
         };
 
         int opt, optindex;
-        while((opt = getopt_long(argc, argv, "-hvgo:e:",
+        while((opt = getopt_long(argc, argv, "-hz:vgo:e:",
                                  long_options, &optindex)) != -1)
         {
             switch(opt)
@@ -978,6 +1049,9 @@ int main(int argc, char *argv[])/*{{{*/
                 break;
             case 'e':
                 effect = optarg;
+                break;
+            case 'z':
+                zoom_geom = optarg;
                 break;
             case 'v':
                 flags |= VERBOSE;
@@ -1095,6 +1169,15 @@ int main(int argc, char *argv[])/*{{{*/
 
             MainFrame frame;
             frame.show();
+
+            if(!zoom_geom.empty())
+            {
+                int x, y, w, h, ww, wh;
+                int nread = sscanf(zoom_geom.c_str(), "%ux%u+%u+%u-%ux%u",&w,&h,&x,&y,&ww,&wh);
+                if(nread != 6)
+                    throw std::runtime_error("Bad zoom specification");
+                frame.show_zoom_frame(ww,wh,x,y,w,h);
+            }
 
             // must open an image immediately?
             if(!infile.empty())
