@@ -1033,6 +1033,8 @@ int main(int argc, char *argv[])/*{{{*/
                 filter(plan, &d_gray, op);
                 timer->stop();
 
+                timerzao->stop();
+
                 free(plan);
 
                 convert(&d_img, &d_gray);
@@ -1056,12 +1058,12 @@ int main(int argc, char *argv[])/*{{{*/
                 filter(plan, &d_channels, op);
                 timer->stop();
 
+                timerzao->stop();
+
                 free(plan);
 
                 convert(&d_img, &d_channels);
             }
-
-            timerzao->stop();
 
             d_img.copy_to_host(imgdata);
 
