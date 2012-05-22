@@ -34,6 +34,13 @@ public:
             unlock();
     }
 
+    void lock()
+    {
+        assert(!m_locked);
+        m_mtx.lock();
+        m_locked = true;
+    }
+
     void unlock()
     {
         assert(m_locked);
