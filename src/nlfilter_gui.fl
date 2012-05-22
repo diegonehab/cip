@@ -40,7 +40,7 @@ widget_class MainFrameUI {open
     } {
       MenuItem {} {
         label {&Point Sampling}
-        callback on_window_point_sampling selected
+        callback on_window_point_sampling
         xywh {0 0 100 20} type Toggle
       }
     }
@@ -49,16 +49,6 @@ widget_class MainFrameUI {open
     label {Post-filter} open
     xywh {73 30 272 25} down_box BORDER_BOX
   } {}
-  Fl_Return_Button {} {
-    label Apply
-    callback on_apply_effect
-    xywh {5 119 75 25}
-  }
-  Fl_Button {} {
-    label Undo
-    callback on_undo_effect
-    xywh {85 119 55 25}
-  }
   Fl_Group m_param_group {open
     xywh {350 31 366 120} align 5
   } {}
@@ -72,8 +62,8 @@ widget_class MainFrameUI {open
   }
   Fl_Light_Button m_grayscale {
     label Grayscale
-    callback on_change_grayscale
-    xywh {152 119 90 25}
+    callback on_change_grayscale selected
+    xywh {254 120 90 25}
   }
   Fl_Choice m_effects {
     label {Effect:}
