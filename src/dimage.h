@@ -518,7 +518,7 @@ void subimage(dimage<T,C> &dst, dimage_ptr<T,C> src, int x, int y, int w, int h)
     {
         cudaMemcpy2D(&dst[i], dst.rowstride()*sizeof(texel_type), 
                      &src[i]+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
-                     w*sizeof(texel_type), h, cudaMemcpyHostToDevice);
+                     w*sizeof(texel_type), h, cudaMemcpyDeviceToDevice);
     }
 
 }
@@ -545,7 +545,7 @@ void subimage(dimage_ptr<T,C> dst, dimage_ptr<T,C> src, int x, int y, int w, int
     {
         cudaMemcpy2D(dst[i], dst.rowstride()*sizeof(texel_type), 
                      &src[i]+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
-                     w*sizeof(texel_type), h, cudaMemcpyHostToDevice);
+                     w*sizeof(texel_type), h, cudaMemcpyDeviceToDevice);
     }
 
 }
