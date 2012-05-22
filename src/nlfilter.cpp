@@ -27,6 +27,7 @@ public:
     void on_file_save();
     void on_file_save_as();
     void on_file_exit();
+    void on_window_point_sampling(bool enable);
 
     void on_choose_effect(effect_type effect);
     void on_apply_effect();
@@ -75,6 +76,8 @@ public:
     }
 
 private:
+    std::string m_file_name;
+
     void restart_render_thread()
     {
         stop_render_thread();
@@ -98,7 +101,12 @@ private:
 
     Fl_Group *m_param_panel; // current effect parameter panel
     ImageFrame *m_image_frame; 
+
+    rod::mutex m_mtx_imgframe_box;
     ImageFrame *m_image_frame_box; 
+
+    int m_last_imgframe_box_pos_x,
+        m_last_imgframe_box_pos_y;
 };
 
 MainFrame::MainFrame()
@@ -109,6 +117,8 @@ MainFrame::MainFrame()
     , m_image_frame_box(NULL)
     , m_terminate_thread(false)
     , m_has_new_render_job(false)
+    , m_last_imgframe_box_pos_x(-666) // our "not set" value \m/
+    , m_last_imgframe_box_pos_y(-666)
 {
     m_effects->add("Identity",0,NULL,(void*)EFFECT_IDENTITY);
     m_effects->add("Posterize",0,NULL,(void*)EFFECT_POSTERIZE);
@@ -263,6 +273,8 @@ void *MainFrame::render_thread(MainFrame *frame)
 
     try
     {
+        rod::unique_lock lkiframebox(frame->m_mtx_imgframe_box);
+
         ImageFrame *imgframe = frame->m_image_frame,
                    *imgframe_box = frame->m_image_frame_box;
 
@@ -276,27 +288,30 @@ void *MainFrame::render_thread(MainFrame *frame)
         if(grayscale)
         {
             plan = filter_create_plan(imgframe->get_grayscale_input(), op);
-            plan_box = filter_create_plan(imgframe_box->get_grayscale_input(), op_box);
+            if(imgframe_box)
+                plan_box = filter_create_plan(imgframe_box->get_grayscale_input(), op_box);
         }
         else
         {
             plan = filter_create_plan(imgframe->get_input(), op);
-            plan_box = filter_create_plan(imgframe_box->get_input(), op_box);
+            if(imgframe_box)
+                plan_box = filter_create_plan(imgframe_box->get_input(), op_box);
         }
+
+        lkiframebox.unlock();
 
         while(!frame->m_terminate_thread)
         {
             rod::unique_lock lk(frame->m_mtx_render_data);
 
             // no render job? sleep
-            if(imgframe_box == NULL || imgframe == NULL || !frame->m_has_new_render_job)
+            if(imgframe == NULL || !frame->m_has_new_render_job)
                 frame->m_wakeup.wait(lk);
 
             // maybe it was set during wait
             imgframe = frame->m_image_frame;
-            imgframe_box = frame->m_image_frame_box;
 
-            if(!frame->m_terminate_thread && imgframe_box != NULL &&
+            if(!frame->m_terminate_thread &&
                imgframe!=NULL && frame->m_has_new_render_job)
             {
                 // fill the operation struct along with its parameters based
@@ -329,7 +344,12 @@ void *MainFrame::render_thread(MainFrame *frame)
                     lkbuffers.unlock();
                 }
 
+                lkiframebox.lock();
+
+                imgframe_box = frame->m_image_frame_box;
+
                 // box
+                if(imgframe_box)
                 {
                     // lock buffers since we'll write on them
                     ImageFrame::OutputBufferLocker lkbuffers(*imgframe_box);
@@ -351,6 +371,7 @@ void *MainFrame::render_thread(MainFrame *frame)
                     // done working with buffers, release the lock
                     lkbuffers.unlock();
                 }
+                lkiframebox.unlock();
 
                 // avoids a deadlock in Fl::lock() because usually we're
                 // destroying the main window if terminate_thread is true
@@ -378,7 +399,16 @@ void *MainFrame::render_thread(MainFrame *frame)
                 frame->m_status_rate->value(rate);
 
                 imgframe->swap_buffers();
-                imgframe_box->swap_buffers();
+
+                lkiframebox.lock();
+
+                imgframe_box = frame->m_image_frame_box;
+
+                if(imgframe_box)
+                    imgframe_box->swap_buffers();
+
+                lkiframebox.unlock();
+
                 Fl::unlock();
                 Fl::awake((void *)NULL); // awake message loop processing
             }
@@ -397,6 +427,7 @@ void *MainFrame::render_thread(MainFrame *frame)
     }
 
     free(plan);
+    free(plan_box);
 }
 
 void MainFrame::on_change_grayscale(bool gs)
@@ -431,9 +462,6 @@ void MainFrame::open(const std::string &fname)
     if(!m_image_frame)
         m_image_frame = new ImageFrame();
 
-    if(!m_image_frame_box)
-        m_image_frame_box = new ImageFrame();
-
     dimage<uchar3> img_byte3;
     img_byte3.copy_from_host(&imgdata[0], width, height);
 
@@ -443,10 +471,9 @@ void MainFrame::open(const std::string &fname)
     m_image_frame->set_input_image(&img_float3);
     m_image_frame->copy_label(("Supersampling: "+fname).c_str());
 
-    m_image_frame_box->set_input_image(&img_float3);
-    m_image_frame_box->copy_label(("Point Sampling: "+fname).c_str());
-
     restart_render_thread();
+
+    m_file_name = fname;
 }
 
 void MainFrame::on_file_open()
@@ -476,6 +503,50 @@ void MainFrame::on_file_save_as()
 
 void MainFrame::on_file_exit()
 {
+    hide();
+}
+
+void MainFrame::on_window_point_sampling(bool enable)
+{
+    // fltk is nuts, we can't trust on m->check() being
+    // correct during user selection. so let's just toggle
+    // current state
+    enable = m_image_frame_box==NULL;
+
+    rod::unique_lock lk(m_mtx_imgframe_box);
+
+    if(!enable)
+    {
+        m_last_imgframe_box_pos_x = m_image_frame_box->x();
+        m_last_imgframe_box_pos_y = m_image_frame_box->y();
+
+        assert(m_image_frame_box != NULL);
+        // we can't hide the window, deinit_gl will fail if we do
+        //m_image_frame_box->hide();
+        delete m_image_frame_box;
+        m_image_frame_box = NULL;
+    }
+    else if(m_image_frame)
+    {
+        assert(m_image_frame_box == NULL);
+
+        if(m_last_imgframe_box_pos_x != -666)
+        {
+            m_image_frame_box = new ImageFrame(m_last_imgframe_box_pos_x,
+                                               m_last_imgframe_box_pos_y);
+        }
+        else
+        {
+            m_image_frame_box = new ImageFrame(
+                                m_image_frame->x()+m_image_frame->w()+10,
+                                m_image_frame->y());
+        }
+
+        m_image_frame_box->set_input_image(dimage_ptr<const float,3>(m_image_frame->get_input()));
+        m_image_frame_box->copy_label(("Point Sampling: "+m_file_name).c_str());
+    }
+
+    restart_render_thread();
 }
 
 void MainFrame::on_choose_effect(effect_type effect)
@@ -1053,6 +1124,14 @@ void on_file_exit(Fl_Menu_ *m, void *)/*{{{*/
     try
     {
         get_frame(m)->on_file_exit();
+    }
+    CATCH()
+}/*}}}*/
+void on_window_point_sampling(Fl_Menu_ *m, void *)/*{{{*/
+{
+    try
+    {
+        get_frame(m)->on_window_point_sampling(m->value());
     }
     CATCH()
 }/*}}}*/

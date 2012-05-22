@@ -1,10 +1,10 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0110 
+version 1.0300 
 header_name {.h} 
 code_name {.cxx}
 widget_class MainFrameUI {open
-  xywh {930 418 720 155} type Double hide
-  class Fl_Double_Window
+  xywh {930 418 720 155} type Double
+  class Fl_Double_Window visible
 } {
   Fl_Menu_Bar {} {open
     xywh {0 0 720 25}
@@ -32,6 +32,16 @@ widget_class MainFrameUI {open
         label {E&xit}
         callback on_file_exit
         xywh {0 0 100 20}
+      }
+    }
+    Submenu {} {
+      label {&Window} open
+      xywh {0 0 100 20}
+    } {
+      MenuItem {} {
+        label {&Point Sampling}
+        callback on_window_point_sampling selected
+        xywh {0 0 100 20} type Toggle
       }
     }
   }
@@ -125,7 +135,7 @@ widget_class ParamThresholdUI {open
     xywh {85 10 265 25} type {Horz Knob} align 4 value 0.5
   }
   Fl_Value_Slider maximum {
-    label {maximum:} selected
+    label {maximum:}
     xywh {85 42 265 25} type {Horz Knob} align 4 value 1
   }
 } 

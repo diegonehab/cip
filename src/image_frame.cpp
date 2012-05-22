@@ -143,8 +143,8 @@ struct ImageFrame::impl
 
 void null_cb(Fl_Widget *, void*) {}
 
-ImageFrame::ImageFrame()
-    : Fl_Gl_Window(0,0,640,480)
+ImageFrame::ImageFrame(int x, int y)
+    : Fl_Gl_Window(x,y,640,480)
 {
     pimpl = new impl();
 
@@ -156,8 +156,14 @@ ImageFrame::ImageFrame()
         show();
         make_current();
 
-        cudaGLSetGLDevice(0);
-        check_cuda_error("Init CUDA-OpenGL interoperability");
+        static bool device_init = false;
+
+        if(!device_init)
+        {
+            cudaGLSetGLDevice(0);
+            check_cuda_error("Init CUDA-OpenGL interoperability");
+            device_init = true;
+        }
 
 //        enable_vsync();
     }
@@ -172,6 +178,7 @@ ImageFrame::~ImageFrame()
 {
     try
     {
+        make_current();
         pimpl->deinitgl();
     }
     catch(std::exception &e)
