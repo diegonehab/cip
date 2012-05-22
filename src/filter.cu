@@ -263,9 +263,13 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
     {
+        if(flags & VERBOSE)
+            timer = &timers.gpu_add("create prefilter plan");
         plan->prefilter_recfilter_plan = 
             recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
                                       weights);
+        if(timer)
+            timer->stop();
     }
 
 
@@ -279,10 +283,14 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
             postfilter_plan = plan->prefilter_recfilter_plan;
         else
         {
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("create postfilter plan");
             postfilter_plan = recfilter5_create_plan<1>(img.width(),
                                                         img.height(),
                                                         img.rowstride(),
                                                         weights);
+            if(timer)
+                timer->stop();
         }
         try
         {
@@ -297,7 +305,11 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
             if(timer)
                 timer->stop();
 
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("copy image to texture",imgsize, "P");
             copy_to_array(plan->a_in, dimage_ptr<const float,C>(&preproc_img));
+            if(timer)
+                timer->stop();
 
             if(postfilter_plan != plan->prefilter_recfilter_plan)
                 free(postfilter_plan);
@@ -324,6 +336,9 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     plan->temp_image.resize(img.width(), img.height());
 
+    if(flags & VERBOSE)
+        timer = &timers.gpu_add("initialize prefilter");
+
     switch(op.pre_filter)
     {
     case FILTER_BSPLINE3:
@@ -334,6 +349,8 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
         init_pre_filter(&mitchell_netravali);
         break;
     }
+    if(timer)
+        timer->stop();
 
     switch(op.type)
     {
