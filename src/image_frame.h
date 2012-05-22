@@ -8,7 +8,7 @@
 class ImageFrame : public Fl_Gl_Window
 {
 public:
-    ImageFrame(int x=0, int y=0);
+    ImageFrame(int x=0, int y=0, int w=64, int h=64);
     ~ImageFrame();
 
     class OutputBufferLocker

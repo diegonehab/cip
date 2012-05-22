@@ -143,8 +143,8 @@ struct ImageFrame::impl
 
 void null_cb(Fl_Widget *, void*) {}
 
-ImageFrame::ImageFrame(int x, int y)
-    : Fl_Gl_Window(x,y,640,480)
+ImageFrame::ImageFrame(int x, int y, int w, int h)
+    : Fl_Gl_Window(x,y,w,h)
 {
     pimpl = new impl();
 
