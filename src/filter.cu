@@ -261,13 +261,37 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     dimage<float,C> preproc_img;
 
+    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        if(flags & VERBOSE)
+            timer = &timers.gpu_add("create prefilter plan");
+        plan->prefilter_recfilter_plan = 
+            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
+                                      weights);
+        if(timer)
+            timer->stop();
+    }
+
+
     if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
     {
         preproc_img.resize(img.width(), img.height());
 
-        recfilter5_plan *postfilter_plan = 
-            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
-                                      weights);
+        recfilter5_plan *postfilter_plan;
+
+        if(op.pre_filter == op.post_filter)
+            postfilter_plan = plan->prefilter_recfilter_plan;
+        else
+        {
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("create postfilter plan");
+            postfilter_plan = recfilter5_create_plan<1>(img.width(),
+                                                        img.height(),
+                                                        img.rowstride(),
+                                                        weights);
+            if(timer)
+                timer->stop();
+        }
         try
         {
             if(flags & VERBOSE)
@@ -281,13 +305,19 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
             if(timer)
                 timer->stop();
 
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("copy image to texture",imgsize, "P");
             copy_to_array(plan->a_in, dimage_ptr<const float,C>(&preproc_img));
+            if(timer)
+                timer->stop();
 
-            free(postfilter_plan);
+            if(postfilter_plan != plan->prefilter_recfilter_plan)
+                free(postfilter_plan);
         }
         catch(...)
         {
-            free(postfilter_plan);
+            if(postfilter_plan != plan->prefilter_recfilter_plan)
+                free(postfilter_plan);
             throw;
         }
     }
@@ -295,13 +325,6 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
     {
         copy_to_array(plan->a_in, img);
         preproc_img = img;
-    }
-
-    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
-    {
-        plan->prefilter_recfilter_plan = 
-            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
-                                      weights);
     }
 
     cfg::tex().normalized = false;
@@ -313,6 +336,9 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     plan->temp_image.resize(img.width(), img.height());
 
+    if(flags & VERBOSE)
+        timer = &timers.gpu_add("initialize prefilter");
+
     switch(op.pre_filter)
     {
     case FILTER_BSPLINE3:
@@ -323,6 +349,8 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
         init_pre_filter(&mitchell_netravali);
         break;
     }
+    if(timer)
+        timer->stop();
 
     switch(op.type)
     {
