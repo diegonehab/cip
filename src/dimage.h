@@ -499,6 +499,22 @@ dimage_ptr<const T, 1> dimage<T,C>::operator[](int i) const
                                  width(), height(), rowstride());
 }
 
+template <class T, int C>
+void subimage(dimage<T,C> &dst, const dimage_ptr<T,C> &src, int x, int y, int w, int h)
+{
+    typedef typename dimage<T,C>::texel_type texel_type;
+
+    dst.resize(w,h);
+    for(int i=0; i<C; ++i)
+    {
+        cudaMemcpy2D(&dst+i*dst.channelstride(), dst.rowstride()*sizeof(texel_type), 
+                     &src+i*src.channelstride()+y*src.rowstride()+x, src.rowstride()*sizeof(texel_type), 
+                     w*sizeof(texel_type), h, cudaMemcpyHostToDevice);
+    }
+
+}
+
+
 
 
 #endif
