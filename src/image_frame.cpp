@@ -186,7 +186,7 @@ ImageFrame::~ImageFrame()
     delete pimpl;
 }
 
-void ImageFrame::set_input_image(dimage_ptr<float3> img)
+void ImageFrame::set_input_image(dimage_ptr<const float3> img)
 {
     if(img.width() <= 0 || img.height()  <= 0)
         throw std::runtime_error("Invalid image dimensions");
@@ -214,7 +214,7 @@ void ImageFrame::set_input_image(dimage_ptr<float3> img)
     check_glerror();
 }
 
-void ImageFrame::set_input_image(dimage_ptr<float,3> img)
+void ImageFrame::set_input_image(dimage_ptr<const float,3> img)
 {
     if(img.width() <= 0 || img.height()  <= 0)
         throw std::runtime_error("Invalid image dimensions");
