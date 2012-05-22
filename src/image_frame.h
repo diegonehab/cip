@@ -39,8 +39,6 @@ public:
     dimage_ptr<const float,1> get_grayscale_input() const;
     dimage_ptr<float,1> get_grayscale_output();
 
-    virtual void resize (int x, int y, int w, int h);
-
     void refresh();
     void swap_buffers();
 private:

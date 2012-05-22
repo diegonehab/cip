@@ -350,15 +350,6 @@ void ImageFrame::reset()
     swap_buffers();
 }
 
-void ImageFrame::resize (int x, int y, int w, int h)
-{
-    Fl_Gl_Window::resize(x,y,w,h);
-
-    glViewport(0,0,w,h);
-    check_glerror();
-}
-
-
 void ImageFrame::draw()
 {
     try
@@ -368,6 +359,9 @@ void ImageFrame::draw()
 
         if(pimpl->must_update_texture)
             pimpl->update_texture();
+
+        glViewport(0,0,w(),h());
+        check_glerror();
 
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, pimpl->tex_output);
