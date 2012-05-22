@@ -215,8 +215,6 @@ void ImageFrame::set_blank_input_image(int w, int h)
 
     pimpl->img_buffer.resize(w,h);
     pimpl->img_backbuffer.resize(w,h);
-
-    resize(x(),y(),w,h);
 }
 
 void ImageFrame::set_input_image(dimage_ptr<const float3> img)

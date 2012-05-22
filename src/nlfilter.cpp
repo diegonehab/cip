@@ -502,7 +502,7 @@ void MainFrame::open(const std::string &fname)/*{{{*/
 
     // create the image frame with the image data
     if(!m_image_frame)
-        m_image_frame = new ImageFrame();
+        m_image_frame = new ImageFrame(0,0,width,height);
 
     dimage<uchar3> img_byte3;
     img_byte3.copy_from_host(&imgdata[0], width, height);
@@ -573,13 +573,17 @@ void MainFrame::on_window_point_sampling(bool enable)/*{{{*/
         if(m_last_imgframe_box_pos_x != -666)
         {
             m_image_frame_box = new ImageFrame(m_last_imgframe_box_pos_x,
-                                               m_last_imgframe_box_pos_y);
+                                               m_last_imgframe_box_pos_y,
+                                               m_image_frame->w(),
+                                               m_image_frame->h());
         }
         else
         {
             m_image_frame_box = new ImageFrame(
                                 m_image_frame->x()+m_image_frame->w()+10,
-                                m_image_frame->y());
+                                m_image_frame->y(),
+                                m_image_frame->w(),
+                                m_image_frame->h());
         }
 
         m_image_frame_box->set_input_image(dimage_ptr<const float,3>(m_image_frame->get_input()));
