@@ -903,7 +903,7 @@ filter_type parse_filter_type(const std::string &name)/*{{{*/
 
 void print_help(const char *progname)/*{{{*/
 {
-    std::cout << "Usage: " << progname << " [--post post_filter] [--pre pre_filter] [-e/--effect effect_descr] [-o/--output output_file] [-h/--help] [input_file]\n"
+    std::cout << "Usage: " << progname << " [-v/--verbose] [--post post_filter] [--pre pre_filter] [-e/--effect effect_descr] [-o/--output output_file] [-h/--help] [input_file]\n"
             " where effect_descr is one of:\n"
             "  - identity[]\n"
             "  - posterize[levels]\n"
@@ -940,6 +940,7 @@ int main(int argc, char *argv[])/*{{{*/
                     outfile,
                     effect = "identity[]";
         bool do_grayscale = false;
+        int flags = 0;
         filter_type prefilter = FILTER_CARDINAL_BSPLINE3,
                     postfilter = FILTER_CARDINAL_BSPLINE3;
 
@@ -950,11 +951,12 @@ int main(int argc, char *argv[])/*{{{*/
             {"help",required_argument,0,'h'},
             {"effect",required_argument,0,'e'},
             {"output",required_argument,0,'o'},
+            {"verbose",no_argument,0,'v'},
             {0,0,0,0}
         };
 
         int opt, optindex;
-        while((opt = getopt_long(argc, argv, "-hgo:e:",
+        while((opt = getopt_long(argc, argv, "-hvgo:e:",
                                  long_options, &optindex)) != -1)
         {
             switch(opt)
@@ -973,6 +975,9 @@ int main(int argc, char *argv[])/*{{{*/
                 break;
             case 'e':
                 effect = optarg;
+                break;
+            case 'v':
+                flags |= VERBOSE;
                 break;
             case 'g':
                 do_grayscale = true;
@@ -1026,7 +1031,7 @@ int main(int argc, char *argv[])/*{{{*/
                 timer = &timers.gpu_add("Preprocessing", width*height, "P");
                 filter_plan *plan
                     = filter_create_plan(dimage_ptr<const float,1>(&d_gray), op,
-                            VERBOSE);
+                            flags);
                 timer->stop();
 
                 timer = &timers.gpu_add("Operation", width*height, "P");
@@ -1049,7 +1054,7 @@ int main(int argc, char *argv[])/*{{{*/
                 timer = &timers.gpu_add("Preprocessing", width*height, "P");
                 filter_plan *plan
                     = filter_create_plan(dimage_ptr<const float,3>(&d_channels), op,
-                            VERBOSE);
+                            flags);
                 timer->stop();
 
                 timer = &timers.gpu_add("Operation", width*height, "P");
