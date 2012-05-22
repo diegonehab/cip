@@ -67,6 +67,10 @@ public:
 
         if(m_image_frame_box)
             m_image_frame_box->show();
+        if(m_zoom_frame)
+            m_zoom_frame->show();
+        if(m_zoom_frame_box)
+            m_zoom_frame_box->show();
     }
     virtual void hide()
     {
@@ -74,6 +78,10 @@ public:
             m_image_frame->hide();
         if(m_image_frame_box)
             m_image_frame_box->hide();
+        if(m_zoom_frame)
+            m_zoom_frame->hide();
+        if(m_zoom_frame_box)
+            m_zoom_frame_box->hide();
         MainFrameUI::hide();
     }
 
