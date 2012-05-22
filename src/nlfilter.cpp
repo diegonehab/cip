@@ -264,7 +264,7 @@ void show_error(std::string *data)/*{{{*/
 {
     if(data != NULL)
     {
-        fl_alert(data->c_str());
+        fl_alert("%s",data->c_str());
         delete data;
     }
 }/*}}}*/
