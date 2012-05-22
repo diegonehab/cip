@@ -261,13 +261,29 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     dimage<float,C> preproc_img;
 
+    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
+    {
+        plan->prefilter_recfilter_plan = 
+            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
+                                      weights);
+    }
+
+
     if(op.post_filter == FILTER_CARDINAL_BSPLINE3)
     {
         preproc_img.resize(img.width(), img.height());
 
-        recfilter5_plan *postfilter_plan = 
-            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
-                                      weights);
+        recfilter5_plan *postfilter_plan;
+
+        if(op.pre_filter == op.post_filter)
+            postfilter_plan = plan->prefilter_recfilter_plan;
+        else
+        {
+            postfilter_plan = recfilter5_create_plan<1>(img.width(),
+                                                        img.height(),
+                                                        img.rowstride(),
+                                                        weights);
+        }
         try
         {
             if(flags & VERBOSE)
@@ -283,11 +299,13 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
             copy_to_array(plan->a_in, dimage_ptr<const float,C>(&preproc_img));
 
-            free(postfilter_plan);
+            if(postfilter_plan != plan->prefilter_recfilter_plan)
+                free(postfilter_plan);
         }
         catch(...)
         {
-            free(postfilter_plan);
+            if(postfilter_plan != plan->prefilter_recfilter_plan)
+                free(postfilter_plan);
             throw;
         }
     }
@@ -295,13 +313,6 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
     {
         copy_to_array(plan->a_in, img);
         preproc_img = img;
-    }
-
-    if(op.pre_filter == FILTER_CARDINAL_BSPLINE3)
-    {
-        plan->prefilter_recfilter_plan = 
-            recfilter5_create_plan<1>(img.width(),img.height(),img.rowstride(),
-                                      weights);
     }
 
     cfg::tex().normalized = false;
