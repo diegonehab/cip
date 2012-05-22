@@ -25,6 +25,7 @@ public:
     };
 
     void set_input_image(dimage_ptr<float3> img);
+    void set_input_image(dimage_ptr<float,3> img);
 
     void set_grayscale(bool en);
 

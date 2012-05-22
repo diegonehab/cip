@@ -214,6 +214,33 @@ void ImageFrame::set_input_image(dimage_ptr<float3> img)
     check_glerror();
 }
 
+void ImageFrame::set_input_image(dimage_ptr<float,3> img)
+{
+    if(img.width() <= 0 || img.height()  <= 0)
+        throw std::runtime_error("Invalid image dimensions");
+
+    make_current();
+
+    if(!pimpl->gl_ok)
+        pimpl->initgl();
+
+    pimpl->img_input = img;
+
+    pimpl->img_input_grayscale.resize(img.width(), img.height());
+    grayscale(&pimpl->img_input_grayscale, img);
+
+    // to create textures and setup output buffers
+    set_grayscale(pimpl->grayscale);
+
+    pimpl->img_buffer.resize(img.width(),img.height());
+    pimpl->img_backbuffer.resize(img.width(),img.height());
+
+    resize(x(),y(),img.width(),img.height());
+
+    glViewport(0,0,img.width(),img.height());
+    check_glerror();
+}
+
 void ImageFrame::set_grayscale(bool en)
 {
     pimpl->grayscale = en;
