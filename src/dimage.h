@@ -538,8 +538,8 @@ void subimage(dimage_ptr<T,C> dst, dimage_ptr<T,C> src, int x, int y, int w, int
     if(y >= src.height() || y < 0)
         throw std::invalid_argument("Bad x position");
 
-    w = min(w, src.width()-x);
-    h = min(w, src.height()-h);
+    w = std::min(w, src.width()-x);
+    h = std::min(w, src.height()-h);
 
     for(int i=0; i<C; ++i)
     {

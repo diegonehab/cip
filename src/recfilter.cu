@@ -1,3 +1,4 @@
+#include "symbol.h"
 #include "recfilter.h"
 
 const int WS = 32;
@@ -66,57 +67,83 @@ namespace
 {
 const recfilter5_plan *g_loaded_plan_in_gpu = NULL;
 
+template <int R>
+struct symbol_vars;
+
+#define DEF_SYMBOL_VARS(N) \
+template<> \
+struct symbol_vars<N> \
+{ \
+    static const Vector<float,N+1> &weights; \
+    static const Matrix<float,N,N> &AbF_T, &AbR_T, &HARB_AFP_T, \
+                                   &AbF, &AbR, &HARB_AFP; \
+    static const Matrix<float,N,32> &ARE_T, &HARB_AFB, \
+                                    &TAFB, &ARB_AFP_T; \
+};\
+const Vector<float,N+1> &symbol_vars<N>::weights = ::c5_##N##_weights; \
+const Matrix<float,N,N> &symbol_vars<N>::AbF_T = ::c5_##N##_AbF_T, \
+                        &symbol_vars<N>::AbR_T = ::c5_##N##_AbR_T, \
+                        &symbol_vars<N>::HARB_AFP_T = ::c5_##N##_HARB_AFP_T, \
+                        &symbol_vars<N>::AbF = ::c5_##N##_AbF, \
+                        &symbol_vars<N>::AbR = ::c5_##N##_AbR, \
+                        &symbol_vars<N>::HARB_AFP = ::c5_##N##_HARB_AFP; \
+const Matrix<float,N,32> &symbol_vars<N>::ARE_T = ::c5_##N##_ARE_T, \
+                         &symbol_vars<N>::HARB_AFB = ::c5_##N##_HARB_AFB, \
+                         &symbol_vars<N>::TAFB = ::c5_##N##_TAFB, \
+                         &symbol_vars<N>::ARB_AFP_T = ::c5_##N##_ARB_AFP_T;
+
+DEF_SYMBOL_VARS(1)
+DEF_SYMBOL_VARS(2)
+
 template<int R>
 void load_plan(const recfilter5_plan_R<R> &plan)
 {
-    std::ostringstream ss;
-    ss << "c5_" << R << "_";
-    std::string prefix = ss.str();
-
     const recfilter5_plan_R<R> *gpu_plan
         = dynamic_cast<const recfilter5_plan_R<R> *>(g_loaded_plan_in_gpu);
 
 
     if(!gpu_plan || gpu_plan->weights != plan.weights)
     {
-        copy_to_symbol(prefix+"weights", plan.weights);
+        typedef symbol_vars<R> sym;
 
-        copy_to_symbol(prefix+"AbF_T", plan.AbF_T);
-        copy_to_symbol(prefix+"AbR_T", plan.AbR_T);
-        copy_to_symbol(prefix+"HARB_AFP_T", plan.HARB_AFP_T);
+        gpu::copy_to_symbol(sym::weights, plan.weights);
 
-        copy_to_symbol(prefix+"AbF", plan.AbF);
-        copy_to_symbol(prefix+"AbR", plan.AbR);
-        copy_to_symbol(prefix+"HARB_AFP", plan.HARB_AFP);
+        gpu::copy_to_symbol(sym::AbF_T, plan.AbF_T);
+        gpu::copy_to_symbol(sym::AbR_T, plan.AbR_T);
+        gpu::copy_to_symbol(sym::HARB_AFP_T, plan.HARB_AFP_T);
 
-        copy_to_symbol(prefix+"ARE_T", plan.ARE_T);
-        copy_to_symbol(prefix+"ARB_AFP_T", plan.ARB_AFP_T);
-        copy_to_symbol(prefix+"TAFB", plan.TAFB);
-        copy_to_symbol(prefix+"HARB_AFB", plan.HARB_AFB);
+        gpu::copy_to_symbol(sym::AbF, plan.AbF);
+        gpu::copy_to_symbol(sym::AbR, plan.AbR);
+        gpu::copy_to_symbol(sym::HARB_AFP, plan.HARB_AFP);
+
+        gpu::copy_to_symbol(sym::ARE_T, plan.ARE_T);
+        gpu::copy_to_symbol(sym::ARB_AFP_T, plan.ARB_AFP_T);
+        gpu::copy_to_symbol(sym::TAFB, plan.TAFB);
+        gpu::copy_to_symbol(sym::HARB_AFB, plan.HARB_AFB);
     }
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->border != plan.border)
-        copy_to_symbol("c_border",plan.border);
+        gpu::copy_to_symbol(c_border,plan.border);
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->rowstride!=plan.rowstride)
-        copy_to_symbol("c_rowstride", plan.rowstride);
+        gpu::copy_to_symbol(c_rowstride, plan.rowstride);
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->width != plan.width
        || g_loaded_plan_in_gpu->border != plan.border)
     {
-        copy_to_symbol("c_width", plan.width); 
-        copy_to_symbol("c_inv_width", plan.inv_width); 
-        copy_to_symbol("c_m_size", plan.m_size); 
-        copy_to_symbol("c_last_m", plan.last_m); 
+        gpu::copy_to_symbol(c_width, plan.width); 
+        gpu::copy_to_symbol(c_inv_width, plan.inv_width); 
+        gpu::copy_to_symbol(c_m_size, plan.m_size); 
+        gpu::copy_to_symbol(c_last_m, plan.last_m); 
     }
 
     if(!g_loaded_plan_in_gpu || g_loaded_plan_in_gpu->height != plan.height
        || g_loaded_plan_in_gpu->border != plan.border)
     {
-        copy_to_symbol("c_inv_height", plan.inv_height);
-        copy_to_symbol("c_height", plan.height);
-        copy_to_symbol("c_n_size", plan.n_size);
-        copy_to_symbol("c_last_n", plan.last_n);
+        gpu::copy_to_symbol(c_inv_height, plan.inv_height);
+        gpu::copy_to_symbol(c_height, plan.height);
+        gpu::copy_to_symbol(c_n_size, plan.n_size);
+        gpu::copy_to_symbol(c_last_n, plan.last_n);
     }
 
     if(!g_loaded_plan_in_gpu)

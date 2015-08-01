@@ -85,6 +85,12 @@ struct array
     T &operator[](int i) { return data[i]; }
 
     size_t size() const { return N; }
+
+    T *begin() { return data; };
+    T *end() { return data+N; };
+
+    const T *begin() const { return data; };
+    const T *end() const { return data+N; };
 };
 
 // for mutable * -> const * conversion
@@ -119,6 +125,9 @@ public:
     const T *const&operator[](int i) const { return m_data[i]; }
 
     size_t size() const { return N; }
+
+    const T *begin() const { return m_data; };
+    const T *end() const { return m_data+N; };
 };
 
 template <class FROM, class TO>

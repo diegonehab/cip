@@ -19,23 +19,23 @@ endif()
 
 message(STATUS "Using ${GCC}")
 
-if(NOT CUDA_SDK_ROOT_DIR)
-    message(FATAL_ERROR "Please set environment variable NVSDKCUDA_ROOT to the
-    SDK base directory (it contains 'common','lib','bin', etc), for instance
-    '/usr/local/cuda/NVIDIA_GPU_Computing_SDK/C'")
-endif()
+#if(NOT CUDA_SDK_ROOT_DIR)
+#    message(FATAL_ERROR "Please set environment variable NVSDKCUDA_ROOT to the
+#    SDK base directory (it contains 'common','lib','bin', etc), for instance
+#    '/usr/local/cuda/NVIDIA_GPU_Computing_SDK/C'")
+#endif()
 
-find_library(CUTIL_LIBRARY NAMES cutil cutil_x86_64 PATHS ${CUDA_SDK_ROOT_DIR}/lib)
+#find_library(CUTIL_LIBRARY NAMES cutil cutil_x86_64 PATHS ${CUDA_SDK_ROOT_DIR}/lib)
 
 set(CUDA_SM 20 CACHE bool "Compile for which sm?")
 
 set(CUDA_NVCC_FLAGS
-  -ccbin=${GCC}
+  # -ccbin=${GCC}
   #-Xptxas -dlcm=cg # gmem uses only L2 cache
   #-Xptxas -dlcm=ca # gmem uses both L1 and L2 cache (default)
   --ptxas-options=-v 
   -ftz=true -prec-div=false -prec-sqrt=false
-  --opencc-options -OPT:Olimit=0
+  #--opencc-options -OPT:Olimit=0
 )
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} 

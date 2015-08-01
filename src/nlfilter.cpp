@@ -1163,7 +1163,7 @@ int main(int argc, char *argv[])/*{{{*/
 
             d_img.copy_to_host(imgdata);
 
-            save_image(outfile, imgdata, width, height);
+            //save_image(outfile, imgdata, width, height);
 
             timers.flush();
 

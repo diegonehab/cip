@@ -1,15 +1,15 @@
-#include <cutil.h>
+#include "cutil.h"
 #include "filter.h"
 #include "timer.h"
 #include "effects.h"
 #include "symbol.h"
+#include "recfilter.h"
 #include "image_util.h"
 #include "blue_noise.h"
 #include "cubic_sampler.h"
 #include "box_sampler.h"
 #include "bspline3.h"
 #include "mitchell_netravali.h"
-#include "recfilter.h"
 #if CUDA_SM < 20
 #   include "cuPrintf.cu"
 #   if __CUDA_ARCH__
@@ -34,9 +34,9 @@ const int
           NB_F2 = 4;
 #endif
 
-__constant__ float2 blue_noise[SAMPDIM];
+__constant__ float2 c_blue_noise[SAMPDIM];
 
-__constant__ float prefilter_data[SAMPDIM*KS*KS];
+__constant__ float c_prefilter_data[SAMPDIM*KS*KS];
 
 texture<float, 2, cudaReadModeElementType> t_aux_float;
 
@@ -222,8 +222,8 @@ void init_pre_filter(float (*prefilter)(float))
         }
     }
 
-    copy_to_symbol("blue_noise",blue_noise);
-    copy_to_symbol("prefilter_data",prefilter_data);
+    gpu::copy_to_symbol(c_blue_noise,blue_noise);
+    gpu::copy_to_symbol(c_prefilter_data,prefilter_data);
 }
 
 template<int C> 
@@ -332,7 +332,7 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
 
     cfg::tex().addressMode[0] = cfg::tex().addressMode[1] = cudaAddressModeClamp;
 
-    copy_to_symbol("filter_op",op);
+    gpu::copy_to_symbol(filter_op,op);
 
     plan->temp_image.resize(img.width(), img.height());
 
@@ -430,7 +430,7 @@ void filter_kernel_ss1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f+0.5f;
 
-    float *bspline3 = prefilter_data;
+    float *bspline3 = c_prefilter_data;
 
     S sampler;
 
@@ -439,7 +439,7 @@ void filter_kernel_ss1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*
 #if SAMPDIM==1
         pixel_type value = do_filter<OP>(sampler, p);
 #else
-        pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
+        pixel_type value = do_filter<OP>(sampler, p+c_blue_noise[s]);
 #endif
         value = srgb2lrgb(value);
 
@@ -518,7 +518,7 @@ void filter_kernel1(dimage_ptr<typename sum_traits<C>::type,KS*KS> out)/*{{{*/
     // top-left position of the kernel support
     float2 p = make_float2(x,y)-1.5f+0.5f;
 
-    float *bspline3 = prefilter_data;
+    float *bspline3 = c_prefilter_data;
 
     S sampler;
 
@@ -591,7 +591,7 @@ void filter_kernel_box_ss(dimage_ptr<float,C> out)/*{{{*/
 #if SAMPDIM == 1
         pixel_type value = do_filter<OP>(sampler, p);
 #else
-        pixel_type value = do_filter<OP>(sampler, p+blue_noise[s]);
+        pixel_type value = do_filter<OP>(sampler, p+c_blue_noise[s]);
 #endif
         sum += srgb2lrgb(value);
     }
@@ -686,7 +686,7 @@ void filter(filter_plan *_plan, dimage_ptr<float,C> out, const filter_operation 
     if(plan->op.post_filter != op.post_filter)
         throw std::runtime_error("Postfilter changed, plan must be recreated");
 
-    copy_to_symbol("filter_op",op);
+    gpu::copy_to_symbol(filter_op,op);
 
     typedef filter_traits<C> cfg;
     assert(plan->temp_image.width() == out.width() &&

@@ -2,41 +2,11 @@
 #define GPUFILTER_H
 
 #include <stdlib.h> // cutil_math needs abs(int) when we're not using nvcc
-#include <cutil_math.h> // for make_typeX
 #include "util.h"
 
 #ifndef HOSTDEV
 #   define HOSTDEV __host__ __device__
 #endif
-
-// these are missing from cutil_math.h
-HOSTDEV
-inline uchar3 make_uchar3(const uchar4 &v)
-{
-    return make_uchar3(v.x,v.y,v.z);
-}
-
-HOSTDEV
-inline uchar4 make_uchar4(const uchar3 &v)
-{
-    return make_uchar4(v.x,v.y,v.z,255);
-}
-
-HOSTDEV inline float2 make_float2(const float2 &v) { return v; }
-HOSTDEV inline float3 make_float3(const float3 &v) { return v; }
-HOSTDEV inline float4 make_float4(const float4 &v) { return v; }
-
-HOSTDEV inline float3 make_float3(const uchar3 &v)
-    { return make_float3(v.x,v.y,v.z); }
-
-HOSTDEV inline uchar2 make_uchar2(const uchar2 &v) { return v; }
-HOSTDEV inline uchar3 make_uchar3(const uchar3 &v) { return v; }
-HOSTDEV inline uchar4 make_uchar4(const uchar4 &v) { return v; }
-HOSTDEV inline uchar3 make_uchar3(float v) 
-    { return make_uchar3(v,v,v); }
-
-HOSTDEV inline uchar3 make_uchar3(const float3 &v) 
-    { return make_uchar3(v.x,v.y,v.z); }
 
 
 template <class T>

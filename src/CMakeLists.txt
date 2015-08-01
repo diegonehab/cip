@@ -1,6 +1,5 @@
-include_directories(${CUDA_SDK_ROOT_DIR}/common/inc ${FLTK_INCLUDE_DIR}
+include_directories(${FLTK_INCLUDE_DIR}
     ${OPENGL_INCLUDE_DIR} ${GLEW_INCLUDE_DIRS})
-link_directories(${CUDA_SDK_ROOT_DIR}/common/lib)
 
 set(CUDA_BUILD_CUBIN off)
 
@@ -16,6 +15,6 @@ set(SOURCES nlfilter.cpp image.cpp recfilter.cu image_frame.cpp
     ${nlfilter_FLTK_UI_SRCS})
 
 cuda_add_executable(nlfilter ${SOURCES})
-target_link_libraries(nlfilter ${CUTIL_LIBRARY} ${FLTK_LIBRARIES}
+target_link_libraries(nlfilter ${FLTK_LIBRARIES}
     ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} pthread)
 

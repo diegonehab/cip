@@ -2,3 +2,5 @@ CMakeCache.txt
 CMakeFiles
 Makefile
 *.cmake
+deb
+rel
