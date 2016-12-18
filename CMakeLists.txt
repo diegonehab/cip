@@ -8,6 +8,9 @@ find_package(FLTK REQUIRED)
 find_package(OpenGL REQUIRED)
 #find_package(Glew)
 
+# Leo: needed to add this
+set(FLTK_FLUID_EXECUTABLE /usr/bin/fluid)
+
 find_program(GCC NAMES gcc-4.5 gcc-4.5.3 gcc-4.5.2 gcc-4.5.1 gcc-4.5.0 gcc-4.4
     gcc-4.4.7 gcc-4.4.6 gcc-4.4.5 gcc-4.4.4 gcc-4.4.3 gcc-4.4.2 gcc-4.4.1
     gcc-4.4.0 gcc-4.3 gcc-4.3.6 gcc-4.3.5 gcc-4.3.4 gcc-4.3.3 gcc-4.3.2
@@ -27,7 +30,8 @@ message(STATUS "Using ${GCC}")
 
 #find_library(CUTIL_LIBRARY NAMES cutil cutil_x86_64 PATHS ${CUDA_SDK_ROOT_DIR}/lib)
 
-set(CUDA_SM 20 CACHE bool "Compile for which sm?")
+#set(CUDA_SM 20 CACHE bool "Compile for which sm?")
+set(CUDA_SM 30 CACHE bool "Compile for which sm?")
 
 set(CUDA_NVCC_FLAGS
   # -ccbin=${GCC}
