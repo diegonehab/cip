@@ -170,6 +170,7 @@ MainFrame::MainFrame()/*{{{*/
     m_post_filter->add("Cardinal Cubic BSpline",0,NULL,(void*)FILTER_CARDINAL_BSPLINE3);
     m_post_filter->add("Michell-Netravali",0,NULL,(void*)FILTER_MITCHELL_NETRAVALI);
     m_post_filter->add("Box",0,NULL,(void*)FILTER_BOX);
+    m_post_filter->add("Sacht-Nehab3",0,NULL,(void*)FILTER_SACHT_NEHAB3);
     m_post_filter->value(1);
     m_post_filter->callback((Fl_Callback *)&MainFrame::on_filter_changed, this);
 }/*}}}*/
@@ -984,6 +985,8 @@ filter_type parse_filter_type(const std::string &name)/*{{{*/
         return FILTER_MITCHELL_NETRAVALI;
     else if(name == "box")
         return FILTER_BOX;
+    else if(name == "sacht-nehab3")
+        return FILTER_SACHT_NEHAB3;
     else
         throw std::runtime_error("Bad filter type");
 }/*}}}*/

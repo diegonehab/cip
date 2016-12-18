@@ -10,6 +10,7 @@
 #include "box_sampler.h"
 #include "bspline3.h"
 #include "mitchell_netravali.h"
+#include "sacht_nehab3.h"
 #if CUDA_SM < 20
 #   include "cuPrintf.cu"
 #   if __CUDA_ARCH__
@@ -289,6 +290,60 @@ filter_create_plan(dimage_ptr<const float,C> img, const filter_operation &op,/*{
                                                         img.height(),
                                                         img.rowstride(),
                                                         weights);
+            if(timer)
+                timer->stop();
+        }
+        try
+        {
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("Convolve with bspline3^-1",
+                                        img.width()*img.height(), "P");
+
+            // convolve with a bpsline3^-1 to make a cardinal post-filter
+            for(int i=0; i<C; ++i)
+                recfilter5(postfilter_plan, preproc_img[i], img[i]);
+
+            if(timer)
+                timer->stop();
+
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("copy image to texture",imgsize, "P");
+            copy_to_array(plan->a_in, dimage_ptr<const float,C>(&preproc_img));
+            if(timer)
+                timer->stop();
+
+            if(postfilter_plan != plan->prefilter_recfilter_plan)
+                free(postfilter_plan);
+        }
+        catch(...)
+        {
+            if(postfilter_plan != plan->prefilter_recfilter_plan)
+                free(postfilter_plan);
+            throw;
+        }
+    }
+    else if(op.post_filter == FILTER_SACHT_NEHAB3)
+    {
+
+        Vector<float,2+1> weights_SN3;
+        weights_SN3[0] = 1.46338646f;
+        weights_SN3[1] = 0.45884159f;
+        weights_SN3[2] = 0.00454486f; 
+
+        preproc_img.resize(img.width(), img.height());
+
+        recfilter5_plan *postfilter_plan;
+
+        if(op.pre_filter == op.post_filter)
+            postfilter_plan = plan->prefilter_recfilter_plan;
+        else
+        {
+            if(flags & VERBOSE)
+                timer = &timers.gpu_add("create postfilter plan");
+            postfilter_plan = recfilter5_create_plan<2>(img.width(),
+                                                        img.height(),
+                                                        img.rowstride(),
+                                                        weights_SN3);
             if(timer)
                 timer->stop();
         }
@@ -837,6 +892,9 @@ void filter(filter_plan *plan, dimage_ptr<float,C> out, const filter_operation &
         break;
     case FILTER_BOX:
         filter<box_sampler<texfetch>, C>(plan, out, op);
+        break;
+    case FILTER_SACHT_NEHAB3:
+        filter<cubic_sampler<sacht_nehab3_weights, texfetch>,C>(plan, out, op);
         break;
     default:
         assert(false);

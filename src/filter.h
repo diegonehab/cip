@@ -37,7 +37,8 @@ enum filter_type
     FILTER_BSPLINE3,
     FILTER_CARDINAL_BSPLINE3,
     FILTER_MITCHELL_NETRAVALI,
-    FILTER_BOX
+    FILTER_BOX,
+    FILTER_SACHT_NEHAB3
 };
 
 enum filter_flags
