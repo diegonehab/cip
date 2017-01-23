@@ -13,9 +13,9 @@ echo "Brightness" >> timing.dat
 echo "Emboss" >> timing.dat
 ./nlfilter --post sacht-nehab3 --pre card-bspline3 -e emboss[5.00,1.00] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Laplacian" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Sharpening" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
 
 echo "16 SAMPLES" >> timing.dat
 sed -i -e 's/SAMPDIM 8/SAMPDIM 16/g' filter.h
@@ -29,9 +29,9 @@ echo "Brightness" >> timing.dat
 echo "Emboss" >> timing.dat
 ./nlfilter --post sacht-nehab3 --pre card-bspline3 -e emboss[5.00,1.00] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Laplacian" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Sharpening" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
 
 echo "32 SAMPLES" >> timing.dat
 sed -i -e 's/SAMPDIM 16/SAMPDIM 32/g' filter.h
@@ -45,9 +45,9 @@ echo "Brightness" >> timing.dat
 echo "Emboss" >> timing.dat
 ./nlfilter --post sacht-nehab3 --pre card-bspline3 -e emboss[5.00,1.00] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Laplacian" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Sharpening" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
 
 echo "64 SAMPLES" >> timing.dat
 sed -i -e 's/SAMPDIM 32/SAMPDIM 64/g' filter.h
@@ -61,6 +61,6 @@ echo "Brightness" >> timing.dat
 echo "Emboss" >> timing.dat
 ./nlfilter --post sacht-nehab3 --pre card-bspline3 -e emboss[5.00,1.00] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Laplacian" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplacian[] --output test.png tucan-1920-1080.png >> timing.dat
 echo "Sharpening" >> timing.dat
-./nlfilter --post sacht-nehab3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
+./nlfilter --post card-bspline3 --pre card-bspline3 -e laplace_edge_enhancement[1.50] --output test.png tucan-1920-1080.png >> timing.dat
