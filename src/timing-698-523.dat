@@ -1,0 +1,100 @@
+8 SAMPLES
+Thershold
+[GPU] 100% - Total Processing: 0.00631 s - 159 FPS - 57.8883 MP/s
+[GPU]  71.3% - Preprocessing: 0.00449 s - 223 FPS - 81.2311 MP/s
+[GPU]  28.6% - Operation: 0.0018 s - 555 FPS - 202.444 MP/s
+Unsharp
+[GPU] 100% - Total Processing: 0.0105 s - 95.5 FPS - 34.8587 MP/s
+[GPU]  69.1% - Preprocessing: 0.00723 s - 138 FPS - 50.472 MP/s
+[GPU]  30.9% - Operation: 0.00323 s - 309 FPS - 112.895 MP/s
+Brightness
+[GPU] 100% - Total Processing: 0.00786 s - 127 FPS - 46.451 MP/s
+[GPU]  48.4% - Preprocessing: 0.0038 s - 263 FPS - 95.9691 MP/s
+[GPU]  51.5% - Operation: 0.00405 s - 247 FPS - 90.2213 MP/s
+Emboss
+[GPU] 100% - Total Processing: 0.006 s - 167 FPS - 60.8423 MP/s
+[GPU]  65.3% - Preprocessing: 0.00392 s - 255 FPS - 93.244 MP/s
+[GPU]  34.6% - Operation: 0.00208 s - 482 FPS - 175.804 MP/s
+Laplacian
+[GPU] 100% - Total Processing: 0.00463 s - 216 FPS - 78.8424 MP/s
+[GPU]  55.5% - Preprocessing: 0.00257 s - 389 FPS - 142.052 MP/s
+[GPU]  44.3% - Operation: 0.00205 s - 487 FPS - 177.938 MP/s
+Sharpening
+[GPU] 100% - Total Processing: 0.00504 s - 198 FPS - 72.4369 MP/s
+[GPU]  54.4% - Preprocessing: 0.00274 s - 364 FPS - 133.06 MP/s
+[GPU]  45.4% - Operation: 0.00229 s - 437 FPS - 159.587 MP/s
+16 SAMPLES
+Thershold
+[GPU] 100% - Total Processing: 0.00725 s - 138 FPS - 50.3608 MP/s
+[GPU]  63.5% - Preprocessing: 0.00461 s - 217 FPS - 79.2537 MP/s
+[GPU]  36.3% - Operation: 0.00263 s - 380 FPS - 138.609 MP/s
+Unsharp
+[GPU] 100% - Total Processing: 0.0112 s - 89.2 FPS - 32.5734 MP/s
+[GPU]  56.5% - Preprocessing: 0.00633 s - 158 FPS - 57.6301 MP/s
+[GPU]  43.4% - Operation: 0.00486 s - 206 FPS - 75.0581 MP/s
+Brightness
+[GPU] 100% - Total Processing: 0.0106 s - 94.8 FPS - 34.5899 MP/s
+[GPU]  37.9% - Preprocessing: 0.004 s - 250 FPS - 91.2613 MP/s
+[GPU]    62% - Operation: 0.00654 s - 153 FPS - 55.7794 MP/s
+Emboss
+[GPU] 100% - Total Processing: 0.0118 s - 84.4 FPS - 30.819 MP/s
+[GPU]  32.6% - Preprocessing: 0.00386 s - 259 FPS - 94.5023 MP/s
+[GPU]  67.3% - Operation: 0.00797 s - 125 FPS - 45.7839 MP/s
+Laplacian
+[GPU] 100% - Total Processing: 0.00727 s - 137 FPS - 50.1909 MP/s
+[GPU]  35.3% - Preprocessing: 0.00257 s - 389 FPS - 142.136 MP/s
+[GPU]  64.6% - Operation: 0.0047 s - 213 FPS - 77.734 MP/s
+Sharpening
+[GPU] 100% - Total Processing: 0.0116 s - 85.8 FPS - 31.3356 MP/s
+[GPU]  21.9% - Preprocessing: 0.00255 s - 392 FPS - 143.082 MP/s
+[GPU]    78% - Operation: 0.00909 s - 110 FPS - 40.1614 MP/s
+32 SAMPLES
+Thershold
+[GPU] 100% - Total Processing: 0.0158 s - 63.3 FPS - 23.097 MP/s
+[GPU]  29.2% - Preprocessing: 0.00461 s - 217 FPS - 79.1136 MP/s
+[GPU]  70.7% - Operation: 0.0112 s - 89.4 FPS - 32.6461 MP/s
+Unsharp
+[GPU] 100% - Total Processing: 0.02 s - 50 FPS - 18.2549 MP/s
+[GPU]  30.9% - Preprocessing: 0.00617 s - 162 FPS - 59.1388 MP/s
+[GPU]  69.1% - Operation: 0.0138 s - 72.4 FPS - 26.4227 MP/s
+Brightness
+[GPU] 100% - Total Processing: 0.0155 s - 64.4 FPS - 23.5143 MP/s
+[GPU]  25.4% - Preprocessing: 0.00394 s - 254 FPS - 92.6917 MP/s
+[GPU]  74.6% - Operation: 0.0116 s - 86.4 FPS - 31.5312 MP/s
+Emboss
+[GPU] 100% - Total Processing: 0.0181 s - 55.1 FPS - 20.1216 MP/s
+[GPU]  20.9% - Preprocessing: 0.00379 s - 264 FPS - 96.3565 MP/s
+[GPU]  79.1% - Operation: 0.0143 s - 69.7 FPS - 25.4482 MP/s
+Laplacian
+[GPU] 100% - Total Processing: 0.0161 s - 62.1 FPS - 22.6588 MP/s
+[GPU]    17% - Preprocessing: 0.00274 s - 365 FPS - 133.384 MP/s
+[GPU]    83% - Operation: 0.0134 s - 74.8 FPS - 27.3145 MP/s
+Sharpening
+[GPU] 100% - Total Processing: 0.0192 s - 52.1 FPS - 19.0181 MP/s
+[GPU]  13.7% - Preprocessing: 0.00263 s - 380 FPS - 138.547 MP/s
+[GPU]  86.2% - Operation: 0.0166 s - 60.4 FPS - 22.056 MP/s
+64 SAMPLES
+Thershold
+[GPU] 100% - Total Processing: 0.0253 s - 39.5 FPS - 14.4127 MP/s
+[GPU]  17.6% - Preprocessing: 0.00445 s - 225 FPS - 81.9718 MP/s
+[GPU]  82.4% - Operation: 0.0209 s - 47.9 FPS - 17.4949 MP/s
+Unsharp
+[GPU] 100% - Total Processing: 0.0326 s - 30.7 FPS - 11.1971 MP/s
+[GPU]  22.3% - Preprocessing: 0.00726 s - 138 FPS - 50.2896 MP/s
+[GPU]  77.7% - Operation: 0.0253 s - 39.5 FPS - 14.4077 MP/s
+Brightness
+[GPU] 100% - Total Processing: 0.0256 s - 39 FPS - 14.24 MP/s
+[GPU]  15.4% - Preprocessing: 0.00394 s - 254 FPS - 92.7324 MP/s
+[GPU]  84.6% - Operation: 0.0217 s - 46.1 FPS - 16.8301 MP/s
+Emboss
+[GPU] 100% - Total Processing: 0.031 s - 32.2 FPS - 11.7607 MP/s
+[GPU]  12.8% - Preprocessing: 0.00398 s - 252 FPS - 91.8196 MP/s
+[GPU]  87.2% - Operation: 0.0271 s - 37 FPS - 13.4929 MP/s
+Laplacian
+[GPU] 100% - Total Processing: 0.028 s - 35.7 FPS - 13.0163 MP/s
+[GPU]  9.57% - Preprocessing: 0.00268 s - 373 FPS - 136.079 MP/s
+[GPU]  90.4% - Operation: 0.0254 s - 39.4 FPS - 14.3981 MP/s
+Sharpening
+[GPU] 100% - Total Processing: 0.0342 s - 29.3 FPS - 10.6811 MP/s
+[GPU]  7.58% - Preprocessing: 0.00259 s - 386 FPS - 140.877 MP/s
+[GPU]  92.4% - Operation: 0.0316 s - 31.7 FPS - 11.5607 MP/s
